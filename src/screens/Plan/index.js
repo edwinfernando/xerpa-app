@@ -4,12 +4,25 @@ import { PlanView } from './PlanView';
 import { planStyles } from './PlanStyles';
 
 export default function PlanScreen({ user }) {
-  const { loading, dias } = usePlan(user);
+  const {
+    loading,
+    weekWorkouts,
+    historyWorkouts,
+    isGenerating,
+    markComplete,
+    handleGeneratePlan,
+    addManualWorkout,
+  } = usePlan(user);
 
   return (
     <PlanView
       loading={loading}
-      dias={dias}
+      weekWorkouts={weekWorkouts}
+      historyWorkouts={historyWorkouts}
+      isGenerating={isGenerating}
+      markComplete={markComplete}
+      handleGeneratePlan={handleGeneratePlan}
+      addManualWorkout={addManualWorkout}
       styles={planStyles}
     />
   );

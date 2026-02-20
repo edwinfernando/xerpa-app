@@ -3,26 +3,32 @@ import { useLogin } from './useLogin';
 import { LoginView } from './LoginView';
 import { loginStyles } from './LoginStyles';
 
-export default function LoginScreen() {
+export default function LoginScreen({ navigation }) {
   const {
     email,
-    setEmail,
     password,
-    setPassword,
     loading,
+    emailError,
+    passwordError,
+    globalAuthError,
+    handleSetEmail,
+    handleSetPassword,
     handleLogin,
-    handleSignUp,
   } = useLogin();
 
   return (
     <LoginView
       email={email}
-      setEmail={setEmail}
       password={password}
-      setPassword={setPassword}
       loading={loading}
+      emailError={emailError}
+      passwordError={passwordError}
+      globalAuthError={globalAuthError}
+      handleSetEmail={handleSetEmail}
+      handleSetPassword={handleSetPassword}
       handleLogin={handleLogin}
-      handleSignUp={handleSignUp}
+      onNavigateSignUp={() => navigation.navigate('SignUp')}
+      onNavigateForgotPassword={() => navigation.navigate('ForgotPassword')}
       styles={loginStyles}
     />
   );

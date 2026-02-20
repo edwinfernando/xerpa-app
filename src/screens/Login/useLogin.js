@@ -1,85 +1,91 @@
 import { useState } from 'react';
-import { Alert } from 'react-native';
 import { supabase } from '../../../supabase';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function mapLoginError(message) {
+  const msg = message.toLowerCase();
+  if (msg.includes('invalid login credentials')) {
+    return 'Correo o contraseña incorrectos.';
+  }
+  if (msg.includes('email not confirmed')) {
+    return 'Por favor, verifica tu correo antes de entrar.';
+  }
+  if (msg.includes('too many requests') || msg.includes('rate limit')) {
+    return 'Demasiados intentos. Espera un momento e inténtalo de nuevo.';
+  }
+  return 'Ocurrió un error inesperado. Intenta de nuevo.';
+}
 
 export function useLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [globalAuthError, setGlobalAuthError] = useState('');
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password) {
-      Alert.alert('Campos requeridos', 'Ingresa tu email y contraseña.');
-      return;
-    }
-
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-
-    if (error) {
-      Alert.alert('Error de inicio de sesión', error.message);
-      return;
-    }
-
-    Alert.alert('¡Bienvenido!', 'Inicio de sesión exitoso.');
+  const handleSetEmail = (text) => {
+    setEmail(text);
+    if (emailError) setEmailError('');
+    if (globalAuthError) setGlobalAuthError('');
   };
 
-  const handleSignUp = async () => {
-    if (!email.trim() || !password) {
-      Alert.alert('Campos requeridos', 'Ingresa tu email y contraseña.');
-      return;
+  const handleSetPassword = (text) => {
+    setPassword(text);
+    if (passwordError) setPasswordError('');
+    if (globalAuthError) setGlobalAuthError('');
+  };
+
+  const handleLogin = async () => {
+    // — Validación frontend (field-level) —
+    let hasError = false;
+
+    if (!email.trim()) {
+      setEmailError('El correo electrónico es obligatorio.');
+      hasError = true;
+    } else if (!EMAIL_REGEX.test(email.trim())) {
+      setEmailError('Por favor, ingresa un correo electrónico válido.');
+      hasError = true;
     }
 
-    if (password.length < 6) {
-      Alert.alert(
-        'Contraseña corta',
-        'La contraseña debe tener al menos 6 caracteres.'
-      );
-      return;
+    if (!password) {
+      setPasswordError('Ingresa tu contraseña para continuar.');
+      hasError = true;
+    } else if (password.length < 6) {
+      setPasswordError('La contraseña debe tener al menos 6 caracteres.');
+      hasError = true;
     }
 
+    if (hasError) return;
+
+    // — Llamada a Supabase (errores → globalAuthError) —
     setLoading(true);
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    setLoading(false);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-    if (signUpError) {
-      Alert.alert('Error de registro', signUpError.message);
-      return;
-    }
-
-    if (data?.user) {
-      const { error: insertError } = await supabase.from('usuarios').insert([
-        {
-          id: data.user.id,
-          email: data.user.email,
-          nombre: data.user.email,
-          rol: 'Atleta',
-        },
-      ]);
-
-      if (insertError) {
-        Alert.alert('Error en la base de datos', insertError.message);
-        return;
+      if (error) {
+        setGlobalAuthError(mapLoginError(error.message));
       }
-
-      Alert.alert(
-        '¡Registro exitoso!',
-        'Verifica tu bandeja de entrada para confirmar tu email.'
-      );
+    } catch {
+      setGlobalAuthError('Sin conexión. Comprueba tu internet e inténtalo de nuevo.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return {
     email,
-    setEmail,
     password,
-    setPassword,
     loading,
+    emailError,
+    passwordError,
+    globalAuthError,
+    handleSetEmail,
+    handleSetPassword,
     handleLogin,
-    handleSignUp,
   };
 }

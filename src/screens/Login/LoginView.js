@@ -1,64 +1,103 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
 export function LoginView({
   email,
-  setEmail,
   password,
-  setPassword,
   loading,
+  emailError,
+  passwordError,
+  globalAuthError,
+  handleSetEmail,
+  handleSetPassword,
   handleLogin,
-  handleSignUp,
+  onNavigateSignUp,
+  onNavigateForgotPassword,
   styles,
 }) {
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <SafeAreaView style={styles.safeContainer}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <LinearGradient
-          colors={['#00F0FF', '#39FF14']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+        <Image
+          source={require('../../../assets/logo.png')}
           style={styles.logo}
+          resizeMode="contain"
         />
 
         <Text style={styles.title}>XERPA</Text>
         <Text style={styles.subtitle}>Tu guía invisible.</Text>
 
         <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Tu email de atleta"
-            placeholderTextColor="#888888"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!loading}
-          />
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Contraseña"
-            placeholderTextColor="#888888"
-            secureTextEntry
-            autoCapitalize="none"
-            editable={!loading}
-          />
+          {/* Email */}
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={[styles.input, emailError && styles.inputError]}
+              value={email}
+              onChangeText={handleSetEmail}
+              placeholder="Tu correo electrónico"
+              placeholderTextColor="#888888"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!loading}
+            />
+            {emailError ? (
+              <Text style={styles.helperText}>{emailError}</Text>
+            ) : null}
+          </View>
+
+          {/* Password con toggle de visibilidad */}
+          <View style={styles.inputWrapper}>
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={[styles.input, styles.passwordInput, passwordError && styles.inputError]}
+                value={password}
+                onChangeText={handleSetPassword}
+                placeholder="Contraseña"
+                placeholderTextColor="#888888"
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                editable={!loading}
+              />
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setShowPassword((prev) => !prev)}
+                disabled={loading}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-off' : 'eye'}
+                  size={22}
+                  color="#888888"
+                />
+              </TouchableOpacity>
+            </View>
+            {passwordError ? (
+              <Text style={styles.helperText}>{passwordError}</Text>
+            ) : null}
+          </View>
         </View>
+
+        {/* Error global de autenticación (Supabase) */}
+        {globalAuthError ? (
+          <Text style={styles.globalAuthError}>{globalAuthError}</Text>
+        ) : null}
 
         <LinearGradient
           colors={['#00F0FF', '#39FF14']}
@@ -71,19 +110,34 @@ export function LoginView({
             onPress={handleLogin}
             disabled={loading}
           >
-            <Text style={styles.buttonText}>
-              {loading ? 'Cargando...' : 'ENTRAR A ENTRENAR'}
-            </Text>
+            {loading ? (
+              <ActivityIndicator color="#121212" />
+            ) : (
+              <Text style={styles.buttonText}>ENTRAR A ENTRENAR</Text>
+            )}
           </TouchableOpacity>
         </LinearGradient>
 
-        <View style={styles.linksContainer}>
-          <Text style={styles.linkGray}>¿Olvidaste tu contraseña?</Text>
-          <View style={styles.spacer} />
-          <TouchableOpacity onPress={handleSignUp} disabled={loading}>
-            <Text style={styles.linkWhite}>¿Nuevo aquí? Regístrate</Text>
-          </TouchableOpacity>
-        </View>
+        {/* "Olvidé mi contraseña" — justo debajo del botón, centrado */}
+        <TouchableOpacity
+          style={styles.forgotPasswordLink}
+          onPress={onNavigateForgotPassword}
+          disabled={loading}
+        >
+          <Text style={styles.forgotPasswordText}>¿Olvidé mi contraseña?</Text>
+        </TouchableOpacity>
+
+        {/* "¿Nuevo aquí? Regístrate" — anclado al fondo de la pantalla */}
+        <TouchableOpacity
+          style={styles.registerContainer}
+          onPress={onNavigateSignUp}
+          disabled={loading}
+        >
+          <Text style={styles.registerText}>
+            ¿Nuevo aquí?{'  '}
+            <Text style={styles.registerHighlight}>Regístrate</Text>
+          </Text>
+        </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
