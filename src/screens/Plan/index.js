@@ -12,6 +12,7 @@ export default function PlanScreen({ user }) {
     markComplete,
     handleGeneratePlan,
     addManualWorkout,
+    saveTimerSession,
   } = usePlan(user);
 
   return (
@@ -23,6 +24,7 @@ export default function PlanScreen({ user }) {
       markComplete={markComplete}
       handleGeneratePlan={handleGeneratePlan}
       addManualWorkout={addManualWorkout}
+      saveTimerSession={saveTimerSession}
       styles={planStyles}
     />
   );

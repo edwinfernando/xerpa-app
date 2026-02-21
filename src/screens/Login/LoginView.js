@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenWrapper } from '../../components/ScreenWrapper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -30,7 +30,7 @@ export function LoginView({
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
+    <ScreenWrapper style={styles.safeContainer}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -139,6 +139,6 @@ export function LoginView({
           </Text>
         </TouchableOpacity>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }

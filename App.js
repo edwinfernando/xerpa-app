@@ -4,6 +4,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { supabase } from './supabase';
 import { AuthStack } from './src/navigation/AuthStack';
 import { MainTabNavigator } from './src/navigation/MainTabNavigator';
+import { DeviceContextProvider } from './src/context/DeviceContext';
+import { WorkoutContextProvider } from './src/context/WorkoutContext';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -35,7 +37,11 @@ export default function App() {
   return (
     <NavigationContainer>
       {user ? (
-        <MainTabNavigator user={user} />
+        <DeviceContextProvider user={user}>
+          <WorkoutContextProvider>
+            <MainTabNavigator user={user} />
+          </WorkoutContextProvider>
+        </DeviceContextProvider>
       ) : (
         <AuthStack />
       )}

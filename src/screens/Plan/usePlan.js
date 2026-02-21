@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
 import { supabase } from '../../../supabase';
+import { useDeviceContext } from '../../hooks/useDeviceContext';
+import { buildN8nPayload } from '../../utils/buildN8nPayload';
 
 // ⚠️ Reemplaza esta URL con tu endpoint de n8n
 const N8N_WEBHOOK_URL = 'https://untremulent-isoagglutinative-irving.ngrok-free.dev/webhook/chat';
@@ -45,6 +47,7 @@ export function groupByMonth(workouts) {
 
 // ─── Hook ────────────────────────────────────────────────────
 export function usePlan(user) {
+  const { location, pushToken } = useDeviceContext();
   const [loading, setLoading] = useState(true);
   const [weekWorkouts, setWeekWorkouts] = useState([]);
   const [historyWorkouts, setHistoryWorkouts] = useState([]);
@@ -80,18 +83,24 @@ export function usePlan(user) {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const markComplete = async (id) => {
-    try {
-      const { error } = await supabase
-        .from('plan_entrenamientos')
-        .update({ completado: true })
-        .eq('id', id);
-      if (error) throw error;
-      setWeekWorkouts(prev =>
-        prev.map(w => w.id === id ? { ...w, completado: true } : w)
-      );
-    } catch {
-      Alert.alert('Error', 'No se pudo marcar como completado.');
-    }
+    const { error } = await supabase
+      .from('plan_entrenamientos')
+      .update({ completado: true })
+      .eq('id', id);
+    if (error) throw error;
+    setWeekWorkouts(prev =>
+      prev.map(w => w.id === id ? { ...w, completado: true } : w)
+    );
+  };
+
+  const saveTimerSession = async ({ duracion_seg, rpe }) => {
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    if (authError || !authUser) throw new Error('Usuario no autenticado');
+    const today = new Date().toISOString().split('T')[0];
+    const { error } = await supabase
+      .from('esfuerzo_manual')
+      .insert({ user_id: authUser.id, duracion_seg, rpe, fecha: today });
+    if (error) throw error;
   };
 
   const addManualWorkout = async (formData) => {
@@ -130,14 +139,21 @@ export function usePlan(user) {
         .eq('id', authUser.id)
         .maybeSingle();
 
+      const body = buildN8nPayload({
+        userId: authUser.id,
+        mensaje: 'Generar plan semanal automático',
+        rol: userData?.rol ?? 'Atleta',
+        location,
+        pushToken,
+      });
+
       const response = await fetch(N8N_WEBHOOK_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: authUser.id,
-          message: 'Generar plan semanal automático',
-          rol: userData?.rol ?? 'Atleta',
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -145,10 +161,10 @@ export function usePlan(user) {
       // Refrescar datos desde Supabase
       await fetchAll();
       Alert.alert('¡Listo! 🚀', '¡Plan generado con éxito! A darlo todo.');
-    } catch {
+    } catch (e) {
       Alert.alert(
-        'Error de conexión',
-        'Hubo un problema de conexión al generar el plan. Intenta de nuevo.'
+        'Error de XERPA',
+        e?.message ?? 'Hubo un problema al generar el plan. Intenta de nuevo.'
       );
     } finally {
       setIsGenerating(false);
@@ -163,6 +179,7 @@ export function usePlan(user) {
     markComplete,
     handleGeneratePlan,
     addManualWorkout,
+    saveTimerSession,
     refetch: fetchAll,
   };
 }

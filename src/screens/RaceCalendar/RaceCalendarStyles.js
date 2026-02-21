@@ -1,144 +1,240 @@
 import { StyleSheet } from 'react-native';
+import { theme } from '../../styles/theme';
 
 export const raceCalendarStyles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: theme.colors.background,
   },
+
+  scrollContent: {
+    paddingHorizontal: theme.spacing.screenPadding,
+    paddingTop: 20,
+    paddingBottom: 48,
+  },
+
+  // ── Header ─────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 20,
     paddingBottom: 16,
   },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#00F0FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   headerLabel: {
-    color: '#888',
-    fontSize: 13,
+    color: '#555',
+    fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 1.5,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   headerTitle: {
     color: '#fff',
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 26,
+    fontWeight: '900',
     letterSpacing: -0.5,
+    lineHeight: 28,
   },
-  list: {
-    paddingHorizontal: 20,
-    paddingBottom: 32,
+  addButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  addButtonGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  // ── Tarjeta ──────────────────────────────────────────────
-  card: {
+  // ── Segmented Control ──────────────────────────────────────
+  segmented: {
+    flexDirection: 'row',
     backgroundColor: '#1A1A1A',
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 14,
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#2A2A2A',
   },
-  cardActive: {
-    borderColor: '#39FF14',
-    shadowColor: '#39FF14',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 6,
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
   },
-  cardProgramada: {
-    borderColor: '#00F0FF',
+  segmentBtnActive: {
+    backgroundColor: '#00F0FF',
     shadowColor: '#00F0FF',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
   },
-  cardFinalizada: {
-    opacity: 0.65,
+  segmentText: {
+    color: '#555',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  segmentTextActive: {
+    color: '#121212',
+    fontWeight: '800',
   },
 
-  // ── Fila superior (nombre + badge estado) ────────────────
+  // ── Stats Strip ────────────────────────────────────────────
+  statsStrip: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    overflow: 'hidden',
+  },
+  statCell: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statCellBorder: {
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(255,255,255,0.07)',
+  },
+  statValue: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+  },
+  statValueCyan: { color: '#00F0FF' },
+  statValueLime: { color: '#39FF14' },
+  statValueOrange: { color: '#ff9800' },
+  statLabel: {
+    color: '#444',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginTop: 2,
+  },
+
+  // ── List ───────────────────────────────────────────────────
+  list: {
+    gap: 12,
+  },
+
+  // ── Race Card ──────────────────────────────────────────────
+  card: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    overflow: 'hidden',
+  },
+  cardContent: {
+    paddingLeft: 20,
+    paddingRight: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+  },
   cardTopRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 10,
   },
   raceName: {
     color: '#fff',
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
     flex: 1,
     marginRight: 10,
+    letterSpacing: -0.3,
+    lineHeight: 20,
   },
-  badge: {
+  raceNameFinalizada: {
+    color: '#555',
+  },
+
+  // ── Countdown pill ─────────────────────────────────────────
+  countdownPill: {
     paddingHorizontal: 10,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0,240,255,0.3)',
+    backgroundColor: 'rgba(0,240,255,0.08)',
   },
-  badgeActiva: {
-    backgroundColor: '#39FF1422',
+  countdownPillToday: {
+    borderColor: 'rgba(57,255,20,0.4)',
+    backgroundColor: 'rgba(57,255,20,0.1)',
   },
-  badgeProgramada: {
-    backgroundColor: '#00F0FF22',
-  },
-  badgeFinalizada: {
-    backgroundColor: '#33333355',
-  },
-  badgeText: {
+  countdownPillText: {
+    color: '#00F0FF',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
-  badgeTextActiva: {
+  countdownPillTextToday: {
     color: '#39FF14',
   },
-  badgeTextProgramada: {
-    color: '#00F0FF',
-  },
-  badgeTextFinalizada: {
-    color: '#666',
-  },
 
-  // ── Fecha y ciudad ────────────────────────────────────────
-  raceDate: {
-    color: '#aaa',
-    fontSize: 13,
-    marginBottom: 2,
+  // ── Badge ──────────────────────────────────────────────────
+  badge: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  raceDateHighlight: {
-    color: '#ccc',
+  badgeActiva: {
+    backgroundColor: 'rgba(57,255,20,0.08)',
+    borderColor: 'rgba(57,255,20,0.3)',
+  },
+  badgeProgramada: {
+    backgroundColor: 'rgba(0,240,255,0.06)',
+    borderColor: 'rgba(0,240,255,0.2)',
+  },
+  badgeFinalizada: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  badgeTextActiva: { color: '#39FF14' },
+  badgeTextProgramada: { color: '#00F0FF' },
+  badgeTextFinalizada: { color: '#444' },
+
+  // ── Info rows ──────────────────────────────────────────────
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  infoText: {
+    color: '#777',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  infoTextHighlight: {
+    color: '#bbb',
     fontWeight: '600',
   },
-  raceCity: {
-    color: '#666',
-    fontSize: 13,
-    marginBottom: 14,
-  },
 
-  // ── Separador ─────────────────────────────────────────────
+  // ── Divider ────────────────────────────────────────────────
   divider: {
     height: 1,
-    backgroundColor: '#2A2A2A',
-    marginBottom: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginVertical: 12,
   },
 
-  // ── Métricas (km / desnivel) ──────────────────────────────
+  // ── Metrics row ────────────────────────────────────────────
   metricsRow: {
     flexDirection: 'row',
-    gap: 20,
+    gap: 18,
   },
   metricItem: {
     flexDirection: 'row',
@@ -146,42 +242,40 @@ export const raceCalendarStyles = StyleSheet.create({
     gap: 5,
   },
   metricValue: {
-    color: '#fff',
+    color: '#ddd',
     fontSize: 14,
     fontWeight: '700',
   },
   metricLabel: {
-    color: '#666',
-    fontSize: 13,
+    color: '#555',
+    fontSize: 12,
+    fontWeight: '500',
   },
 
-  // ── Resultado (solo si Finalizada) ────────────────────────
+  // ── Resultado ─────────────────────────────────────────────
   resultRow: {
-    marginTop: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    marginTop: 8,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
   },
-  resultLabel: {
-    color: '#666',
-    fontSize: 12,
-  },
-  resultValue: {
-    color: '#aaa',
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  resultLabel: { color: '#444', fontSize: 12 },
+  resultValue: { color: '#888', fontSize: 12, fontWeight: '600' },
 
   // ── Loading ───────────────────────────────────────────────
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 12,
   },
   loadingText: {
-    color: '#666',
-    marginTop: 12,
-    fontSize: 14,
+    color: '#444',
+    fontSize: 13,
+    fontWeight: '500',
   },
 
   // ── Error ─────────────────────────────────────────────────
@@ -190,11 +284,13 @@ export const raceCalendarStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
+    gap: 14,
   },
   errorText: {
-    color: '#FF4444',
+    color: '#ff5252',
     fontSize: 14,
     textAlign: 'center',
+    lineHeight: 22,
   },
 
   // ── Empty state ───────────────────────────────────────────
@@ -204,107 +300,134 @@ export const raceCalendarStyles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 36,
     paddingBottom: 60,
+    gap: 12,
   },
-  emptyIcon: {
-    fontSize: 52,
-    marginBottom: 20,
+  emptyIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(0,240,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,240,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    shadowColor: '#00F0FF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
   },
   emptyTitle: {
-    color: '#00F0FF',
+    color: '#fff',
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 10,
+    letterSpacing: -0.3,
   },
   emptyText: {
-    color: '#666',
+    color: '#444',
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 28,
   },
   emptyButton: {
-    backgroundColor: '#1A1A1A',
-    borderWidth: 1,
-    borderColor: '#39FF14',
+    marginTop: 8,
     borderRadius: 14,
+    overflow: 'hidden',
+  },
+  emptyButtonGradient: {
     paddingVertical: 14,
     paddingHorizontal: 28,
+    alignItems: 'center',
   },
   emptyButtonText: {
-    color: '#39FF14',
+    color: '#0D0D0D',
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 
-  // ── Bottom Sheet (Añadir Carrera) ─────────────────────────
+  // ── Bottom Sheet ──────────────────────────────────────────
   sheetOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     justifyContent: 'flex-end',
   },
   sheetContainer: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#131313',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 40,
+    paddingBottom: 44,
     borderTopWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: 'rgba(255,255,255,0.08)',
     maxHeight: '92%',
   },
   sheetHandle: {
     width: 40,
     height: 4,
-    backgroundColor: '#333',
+    backgroundColor: '#2A2A2A',
     borderRadius: 2,
     alignSelf: 'center',
-    marginBottom: 20,
+    marginBottom: 22,
+  },
+  sheetTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 6,
   },
   sheetTitle: {
     color: '#fff',
     fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-    marginBottom: 4,
+    fontWeight: '900',
+    letterSpacing: -0.4,
+  },
+  sheetSubtitle: {
+    color: '#444',
+    fontSize: 13,
+    marginBottom: 16,
   },
 
   // ── Formulario ────────────────────────────────────────────
   formLabel: {
-    color: '#888',
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.8,
+    color: '#555',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
-    marginBottom: 6,
-    marginTop: 14,
+    marginBottom: 7,
+    marginTop: 16,
   },
   formInput: {
-    backgroundColor: '#111',
+    backgroundColor: 'rgba(255,255,255,0.04)',
     color: '#fff',
     borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 15,
   },
   formInputError: {
-    borderColor: '#FF4444',
+    borderColor: '#ff5252',
   },
   formHelperText: {
-    color: '#FF4444',
+    color: '#ff5252',
     fontSize: 12,
     marginTop: 5,
-    marginLeft: 2,
   },
   formRow: {
     flexDirection: 'row',
-    marginTop: 14,
+    gap: 12,
+    marginTop: 16,
   },
   formRowItem: {
     flex: 1,
+  },
+  formRowItemLabelFix: {
+    marginTop: 0,
   },
 
   // ── Botones del sheet ─────────────────────────────────────
@@ -312,20 +435,18 @@ export const raceCalendarStyles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginTop: 24,
-    marginBottom: 4,
   },
   modalCancelBtn: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 15,
     borderRadius: 14,
-    backgroundColor: '#121212',
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalCancelText: {
-    color: '#666',
+    color: '#555',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -335,14 +456,64 @@ export const raceCalendarStyles = StyleSheet.create({
     overflow: 'hidden',
   },
   modalSaveBtn: {
-    paddingVertical: 14,
+    paddingVertical: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 50,
   },
   modalSaveText: {
-    color: '#121212',
+    color: '#0D0D0D',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+
+  // ── Global Race Detail Sheet ───────────────────────────────
+  detailSheet: {
+    backgroundColor: '#131313',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 44,
+    borderTopWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    maxHeight: '85%',
+  },
+  detailHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  detailEnrollBtn: {
+    paddingVertical: 16,
+    borderRadius: 14,
+    overflow: 'hidden',
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  detailCancelBtn: {
+    marginTop: 20,
+    paddingVertical: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#ff5252',
+    backgroundColor: 'rgba(255,82,82,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailCancelBtnText: {
+    color: '#ff5252',
     fontSize: 14,
     fontWeight: '800',
+  },
+  inscritoBadge: {
+    color: '#39FF14',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 4,
+    letterSpacing: 0.5,
   },
 });

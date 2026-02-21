@@ -1,13 +1,14 @@
 import { StyleSheet } from 'react-native';
+import { theme } from '../../styles/theme';
 
 export const xerpaAIStyles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: theme.spacing.screenPadding,
   },
   messagesList: {
     flexGrow: 1,

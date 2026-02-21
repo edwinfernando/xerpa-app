@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenWrapper } from '../../components/ScreenWrapper';
+import { useWorkoutContext } from '../../context/WorkoutContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { getWeekBounds, generateWeekDays, groupByMonth } from './usePlan';
@@ -56,12 +57,189 @@ function getTypeConfig(tipo) {
   return { icon: 'lightning-bolt', color: '#ffca28' };
 }
 
+function formatTimer(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+}
+
+function getRpeColor(n) {
+  if (n <= 3) return '#39FF14';
+  if (n <= 5) return '#ffca28';
+  if (n <= 7) return '#ff9800';
+  return '#ff5252';
+}
+
+const RPE_LABELS = {
+  1: 'Descanso activo · sin esfuerzo',
+  2: 'Muy suave · casi sin esfuerzo',
+  3: 'Suave · conversación fácil',
+  4: 'Moderado · algo de esfuerzo',
+  5: 'Algo duro · esfuerzo constante',
+  6: 'Duro · hablar cuesta trabajo',
+  7: 'Muy duro · solo frases cortas',
+  8: 'Extremo · casi al límite',
+  9: 'Severo · insostenible',
+  10: 'Absoluto · todo lo que tienes',
+};
+
+// ─────────────────────────────────────────────────────────────
+// WorkoutDetailSheet — Bottom Sheet interactivo
+// ─────────────────────────────────────────────────────────────
+function WorkoutDetailSheet({ visible, workout, dateStr, onClose, onComplete, styles }) {
+  const [completing, setCompleting] = useState(false);
+
+  if (!workout) return null;
+
+  const { icon, color } = getTypeConfig(workout.tipo);
+  const duracion = formatDuracion(workout.duracion_min);
+
+  async function handleComplete() {
+    setCompleting(true);
+    try {
+      await onComplete(workout.id);
+      onClose();
+    } catch (e) {
+      Alert.alert('Error de XERPA', e?.message ?? 'No se pudo marcar el entrenamiento como completado.');
+    } finally {
+      setCompleting(false);
+    }
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.detailModalContainer}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+
+      <View style={styles.detailSheet}>
+        <View style={styles.detailHandle} />
+
+        <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+          {/* Icono grande + pill tipo */}
+          <View style={styles.detailIconRow}>
+            <View style={[
+              styles.detailIconWrap,
+              { backgroundColor: color + '18', borderColor: color + '44' },
+            ]}>
+              <MaterialCommunityIcons name={icon} size={42} color={color} />
+            </View>
+            {!!workout.tipo && (
+              <View style={[
+                styles.detailTypePill,
+                { borderColor: color + '50', backgroundColor: color + '14' },
+              ]}>
+                <Text style={[styles.detailTypePillText, { color }]}>
+                  {workout.tipo}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Título */}
+          <Text style={styles.detailTitle}>{workout.titulo ?? 'Entrenamiento'}</Text>
+
+          {/* Fecha */}
+          {!!dateStr && (
+            <Text style={styles.detailDate}>{formatDateLabel(dateStr)}</Text>
+          )}
+
+          {/* Badge de estado */}
+          <View style={styles.detailStatusRow}>
+            <View style={[
+              styles.detailStatusBadge,
+              workout.completado ? styles.detailStatusCompleted : styles.detailStatusPending,
+            ]}>
+              <Ionicons
+                name={workout.completado ? 'checkmark-circle' : 'time-outline'}
+                size={13}
+                color={workout.completado ? '#39FF14' : '#ff9800'}
+              />
+              <Text style={[
+                styles.detailStatusText,
+                workout.completado ? styles.detailStatusTextCompleted : styles.detailStatusTextPending,
+              ]}>
+                {workout.completado ? 'Completado' : 'Pendiente'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Métricas */}
+          {(duracion || workout.tss_plan != null) && (
+            <View style={styles.detailMetricsRow}>
+              {duracion && (
+                <View style={styles.detailMetricBox}>
+                  <Text style={[styles.detailMetricValue, { color: '#00F0FF' }]}>
+                    {duracion}
+                  </Text>
+                  <Text style={styles.detailMetricLabel}>Duración</Text>
+                </View>
+              )}
+              {workout.tss_plan != null && (
+                <View style={styles.detailMetricBox}>
+                  <Text style={[styles.detailMetricValue, { color: '#39FF14' }]}>
+                    {workout.tss_plan}
+                  </Text>
+                  <Text style={styles.detailMetricLabel}>TSS Plan</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Descripción / Detalle del coach */}
+          {!!workout.detalle && (
+            <>
+              <View style={styles.detailDivider} />
+              <Text style={styles.detailSectionLabel}>Instrucciones del Entreno</Text>
+              <Text style={styles.detailText}>{workout.detalle}</Text>
+            </>
+          )}
+
+          {/* Acciones */}
+          <View style={styles.detailActions}>
+            <TouchableOpacity style={styles.detailCloseBtn} onPress={onClose}>
+              <Text style={styles.detailCloseBtnText}>Cerrar</Text>
+            </TouchableOpacity>
+
+            {workout.completado ? (
+              <View style={styles.detailAlreadyDone}>
+                <Ionicons name="checkmark-circle" size={15} color="#39FF1477" />
+                <Text style={styles.detailAlreadyDoneText}>Ya completado</Text>
+              </View>
+            ) : (
+              <LinearGradient
+                colors={['#39FF14', '#00F0FF']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.detailCompleteGradient}
+              >
+                <TouchableOpacity
+                  style={styles.detailCompleteBtn}
+                  onPress={handleComplete}
+                  disabled={completing}
+                >
+                  {completing
+                    ? <ActivityIndicator size="small" color="#0F1116" />
+                    : <Text style={styles.detailCompleteBtnText}>✅ Marcar Completado</Text>
+                  }
+                </TouchableOpacity>
+              </LinearGradient>
+            )}
+          </View>
+        </ScrollView>
+      </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────
 // WorkoutCard — Past
 // ─────────────────────────────────────────────────────────────
-function PastCard({ dateStr, workout, styles }) {
+function PastCard({ dateStr, workout, onPress, styles }) {
   const { icon, color } = getTypeConfig(workout?.tipo);
-  return (
+
+  const inner = (
     <View style={[styles.card, styles.cardPast]}>
       <View style={styles.cardHeader}>
         <View style={[styles.cardIconBox, { borderWidth: 1, borderColor: color + '44' }]}>
@@ -95,15 +273,31 @@ function PastCard({ dateStr, workout, styles }) {
       )}
     </View>
   );
+
+  if (!workout || !onPress) return inner;
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
+      {inner}
+    </TouchableOpacity>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────
-// WorkoutCard — Today (Focus Card)
+// WorkoutCard — Today (Focus Card) — ahora tappable
 // ─────────────────────────────────────────────────────────────
-function TodayCard({ dateStr, workout, onComplete, styles }) {
+function TodayCard({ dateStr, workout, onPress, onStop, styles }) {
   const { icon, color } = getTypeConfig(workout?.tipo);
+  const { isTimerActive, startTimer } = useWorkoutContext();
+
+  // Mostrar botón solo si hay entreno y no está completado
+  const showTimerBtn = workout && !workout.completado;
+
   return (
-    <View style={[styles.card, styles.cardToday]}>
+    <TouchableOpacity
+      style={[styles.card, styles.cardToday]}
+      onPress={workout ? onPress : undefined}
+      activeOpacity={workout ? 0.82 : 1}
+    >
       {/* Pill "HOY" */}
       <View style={styles.todayPill}>
         <View style={styles.todayPillDot} />
@@ -122,6 +316,9 @@ function TodayCard({ dateStr, workout, onComplete, styles }) {
             {workout?.titulo ?? 'Sin entrenamiento planificado'}
           </Text>
         </View>
+        {workout && !showTimerBtn && (
+          <Ionicons name="chevron-forward" size={18} color="#39FF1455" />
+        )}
       </View>
 
       {workout && (
@@ -138,36 +335,38 @@ function TodayCard({ dateStr, workout, onComplete, styles }) {
               <Text style={styles.statValue}>{workout.tss_plan}</Text>
             </View>
           )}
-        </View>
-      )}
-
-      {workout && (
-        <View style={styles.focusActions}>
-          <TouchableOpacity
-            style={styles.focusEditBtn}
-            onPress={() => Alert.alert('Próximamente', 'La edición de entrenamientos estará disponible pronto.')}
-          >
-            <Text style={styles.focusEditText}>✏️  Editar</Text>
-          </TouchableOpacity>
-          {workout.completado ? (
-            <View style={styles.focusCompletedBtn}>
-              <Text style={styles.focusCompletedText}>✅  Completado</Text>
+          {workout.completado && (
+            <View style={[styles.statItem, { marginLeft: 'auto' }]}>
+              <Ionicons name="checkmark-circle" size={14} color="#39FF14" />
+              <Text style={[styles.statLabel, { color: '#39FF14' }]}> Hecho</Text>
             </View>
-          ) : (
-            <TouchableOpacity style={styles.focusCompleteBtn} onPress={() => onComplete(workout.id)}>
-              <Text style={styles.focusCompleteText}>✅  Completar</Text>
-            </TouchableOpacity>
           )}
         </View>
       )}
-    </View>
+
+      {/* ── Botón Play/Stop en esquina superior derecha ─────── */}
+      {showTimerBtn && (
+        <TouchableOpacity
+          style={styles.cardTimerBtn}
+          onPress={isTimerActive ? onStop : startTimer}
+          activeOpacity={0.75}
+          hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+        >
+          <Ionicons
+            name={isTimerActive ? 'stop-circle' : 'play-circle'}
+            size={34}
+            color={isTimerActive ? '#ff5252' : '#39FF14'}
+          />
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
 // WorkoutCard — Future
 // ─────────────────────────────────────────────────────────────
-function FutureCard({ dateStr, workout, styles }) {
+function FutureCard({ dateStr, workout, onPress, styles }) {
   if (!workout) {
     return (
       <View style={[styles.card, styles.cardRest]}>
@@ -186,7 +385,7 @@ function FutureCard({ dateStr, workout, styles }) {
 
   const { icon, color } = getTypeConfig(workout.tipo);
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.75}>
       <View style={styles.cardHeader}>
         <View style={[styles.cardIconBox, { borderWidth: 1, borderColor: color + '33' }]}>
           <MaterialCommunityIcons name={icon} size={20} color={color} />
@@ -195,6 +394,7 @@ function FutureCard({ dateStr, workout, styles }) {
           <Text style={styles.cardDayLabel}>{formatDateLabel(dateStr)}</Text>
           <Text style={styles.cardTitle}>{workout.titulo ?? 'Entrenamiento'}</Text>
         </View>
+        <Ionicons name="chevron-forward" size={16} color="#444" />
       </View>
       <View style={styles.cardStats}>
         {formatDuracion(workout.duracion_min) && (
@@ -210,7 +410,7 @@ function FutureCard({ dateStr, workout, styles }) {
           </View>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -248,8 +448,8 @@ function AddManualModal({ visible, onClose, onSave, styles }) {
       resetForm();
       onClose();
       Alert.alert('¡Listo! 💪', 'Entrenamiento añadido al plan.');
-    } catch {
-      Alert.alert('Error', 'No se pudo guardar el entrenamiento. Intenta de nuevo.');
+    } catch (e) {
+      Alert.alert('Error de XERPA', e?.message ?? 'No se pudo guardar el entrenamiento. Intenta de nuevo.');
     } finally {
       setSaving(false);
     }
@@ -267,7 +467,6 @@ function AddManualModal({ visible, onClose, onSave, styles }) {
           <Text style={styles.manualModalTitle}>Añadir Entrenamiento</Text>
 
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {/* Título */}
             <Text style={styles.manualLabel}>Título *</Text>
             <TextInput
               style={[styles.manualInput, !!tituloError && styles.manualInputError]}
@@ -278,7 +477,6 @@ function AddManualModal({ visible, onClose, onSave, styles }) {
             />
             {!!tituloError && <Text style={styles.manualErrorText}>{tituloError}</Text>}
 
-            {/* Tipo */}
             <Text style={styles.manualLabel}>Tipo</Text>
             <View style={styles.tipoPills}>
               {TIPO_OPTIONS.map(t => (
@@ -292,7 +490,6 @@ function AddManualModal({ visible, onClose, onSave, styles }) {
               ))}
             </View>
 
-            {/* Fecha */}
             <Text style={styles.manualLabel}>Fecha</Text>
             <TextInput
               style={styles.manualInput}
@@ -303,7 +500,6 @@ function AddManualModal({ visible, onClose, onSave, styles }) {
               keyboardType="numbers-and-punctuation"
             />
 
-            {/* Duración + TSS */}
             <View style={styles.manualRow}>
               <View style={styles.manualRowItem}>
                 <Text style={styles.manualLabel}>Duración (min)</Text>
@@ -329,7 +525,6 @@ function AddManualModal({ visible, onClose, onSave, styles }) {
               </View>
             </View>
 
-            {/* Detalle */}
             <Text style={styles.manualLabel}>Notas / Detalle</Text>
             <TextInput
               style={[styles.manualInput, styles.manualTextarea]}
@@ -341,7 +536,6 @@ function AddManualModal({ visible, onClose, onSave, styles }) {
               numberOfLines={3}
             />
 
-            {/* Botones */}
             <View style={styles.manualActions}>
               <TouchableOpacity style={styles.manualCancelBtn} onPress={handleClose}>
                 <Text style={styles.manualCancelText}>Cancelar</Text>
@@ -388,9 +582,106 @@ function GeneratingOverlay({ visible, styles }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// TimerFinishSheet — Sheet de finalización con RPE
+// ─────────────────────────────────────────────────────────────
+function TimerFinishSheet({ visible, totalSecs, onClose, onSave, styles }) {
+  const [rpe, setRpe] = useState(5);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (visible) setRpe(5);
+  }, [visible]);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await onSave({ duracion_seg: totalSecs, rpe });
+      onClose();
+      Alert.alert('¡Sesión guardada! 💪', 'Tu actividad fue registrada en el diario.');
+    } catch (e) {
+      Alert.alert('Error de XERPA', e?.message ?? 'No se pudo guardar la sesión. Intenta de nuevo.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.finishModalContainer}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+
+      <View style={styles.finishSheet}>
+        <View style={styles.finishHandle} />
+
+        {/* Tiempo registrado */}
+        <Text style={styles.finishTimerLabel}>Tiempo registrado</Text>
+        <Text style={styles.finishTimerDisplay}>{formatTimer(totalSecs)}</Text>
+
+        {/* Selector RPE */}
+        <Text style={styles.finishRpeTitle}>Esfuerzo Percibido (RPE 1–10)</Text>
+        <View style={styles.finishRpeRow}>
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => {
+            const c = getRpeColor(n);
+            const active = rpe === n;
+            return (
+              <TouchableOpacity
+                key={n}
+                style={[
+                  styles.finishRpePill,
+                  active && { backgroundColor: c + '22', borderColor: c },
+                ]}
+                onPress={() => setRpe(n)}
+              >
+                <Text style={[
+                  styles.finishRpePillText,
+                  active && { color: c, fontWeight: '900' },
+                ]}>
+                  {n}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Descripción RPE */}
+        <Text style={[styles.finishRpeDesc, { color: getRpeColor(rpe) }]}>
+          {RPE_LABELS[rpe]}
+        </Text>
+
+        {/* Botones */}
+        <View style={styles.finishActions}>
+          <TouchableOpacity style={styles.finishDiscardBtn} onPress={onClose}>
+            <Text style={styles.finishDiscardText}>Descartar</Text>
+          </TouchableOpacity>
+
+          <LinearGradient
+            colors={['#39FF14', '#00F0FF']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.finishSaveGradient}
+          >
+            <TouchableOpacity
+              style={styles.finishSaveBtn}
+              onPress={handleSave}
+              disabled={saving}
+            >
+              {saving
+                ? <ActivityIndicator size="small" color="#0F1116" />
+                : <Text style={styles.finishSaveText}>💾 Guardar en Diario</Text>
+              }
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
+      </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // Pestaña Semana Actual
 // ─────────────────────────────────────────────────────────────
-function WeekTab({ weekWorkouts, onComplete, onGeneratePlan, isGenerating, onAddManual, styles }) {
+function WeekTab({ weekWorkouts, onGeneratePlan, isGenerating, onAddManual, onOpenDetail, onStopTimer, styles }) {
   const { monday, today } = getWeekBounds();
   const weekDays = generateWeekDays(monday);
 
@@ -418,15 +709,12 @@ function WeekTab({ weekWorkouts, onComplete, onGeneratePlan, isGenerating, onAdd
           </TouchableOpacity>
         </LinearGradient>
 
-        <TouchableOpacity
-          style={styles.actionGhost}
-          onPress={onAddManual}
-        >
+        <TouchableOpacity style={styles.actionGhost} onPress={onAddManual}>
           <Text style={styles.actionGhostText}>➕ Añadir</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 7 Cards Mon-Sun */}
+      {/* 7 Cards Lun-Dom */}
       {weekDays.map(dateStr => {
         const workout = workoutMap[dateStr] ?? null;
         const isPast = dateStr < today;
@@ -438,7 +726,8 @@ function WeekTab({ weekWorkouts, onComplete, onGeneratePlan, isGenerating, onAdd
               key={dateStr}
               dateStr={dateStr}
               workout={workout}
-              onComplete={onComplete}
+              onPress={() => workout && onOpenDetail(workout, dateStr)}
+              onStop={onStopTimer}
               styles={styles}
             />
           );
@@ -449,6 +738,7 @@ function WeekTab({ weekWorkouts, onComplete, onGeneratePlan, isGenerating, onAdd
               key={dateStr}
               dateStr={dateStr}
               workout={workout}
+              onPress={() => workout && onOpenDetail(workout, dateStr)}
               styles={styles}
             />
           );
@@ -458,6 +748,7 @@ function WeekTab({ weekWorkouts, onComplete, onGeneratePlan, isGenerating, onAdd
             key={dateStr}
             dateStr={dateStr}
             workout={workout}
+            onPress={() => workout && onOpenDetail(workout, dateStr)}
             styles={styles}
           />
         );
@@ -479,7 +770,7 @@ function WeekTab({ weekWorkouts, onComplete, onGeneratePlan, isGenerating, onAdd
 // ─────────────────────────────────────────────────────────────
 // Pestaña Historial
 // ─────────────────────────────────────────────────────────────
-function HistoryTab({ historyWorkouts, styles }) {
+function HistoryTab({ historyWorkouts, onOpenDetail, styles }) {
   if (historyWorkouts.length === 0) {
     return (
       <View style={styles.emptyState}>
@@ -498,17 +789,20 @@ function HistoryTab({ historyWorkouts, styles }) {
     <>
       {groups.map(({ month, items }) => (
         <View key={month}>
-          {/* Cabecera de mes */}
           <View style={styles.monthHeader}>
             <Text style={styles.monthHeaderText}>{month}</Text>
             <View style={styles.monthHeaderLine} />
           </View>
 
-          {/* Items del mes */}
           {items.map(item => {
             const { icon, color } = getTypeConfig(item.tipo);
             return (
-              <View key={item.id} style={styles.historyItem}>
+              <TouchableOpacity
+                key={item.id}
+                style={styles.historyItem}
+                onPress={() => onOpenDetail(item, item.fecha)}
+                activeOpacity={0.7}
+              >
                 <View style={[styles.historyIconBox, { borderWidth: 1, borderColor: color + '33' }]}>
                   <MaterialCommunityIcons name={icon} size={16} color={color + 'aa'} />
                 </View>
@@ -530,7 +824,7 @@ function HistoryTab({ historyWorkouts, styles }) {
                     color={item.completado ? '#39FF14' : '#444'}
                   />
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })}
         </View>
@@ -542,9 +836,26 @@ function HistoryTab({ historyWorkouts, styles }) {
 // ─────────────────────────────────────────────────────────────
 // PlanView (raíz)
 // ─────────────────────────────────────────────────────────────
-export function PlanView({ loading, weekWorkouts, historyWorkouts, markComplete, isGenerating, handleGeneratePlan, addManualWorkout, styles }) {
+export function PlanView({
+  loading,
+  weekWorkouts,
+  historyWorkouts,
+  markComplete,
+  isGenerating,
+  handleGeneratePlan,
+  addManualWorkout,
+  saveTimerSession,
+  styles,
+}) {
   const [activeTab, setActiveTab] = useState('week');
   const [isManualModalVisible, setIsManualModalVisible] = useState(false);
+  const [selectedWorkout, setSelectedWorkout] = useState(null);
+  const [selectedDateStr, setSelectedDateStr] = useState('');
+
+  // ── Cronómetro (estado global vía WorkoutContext) ────────
+  const { timerSecs, stopTimer: contextStopTimer, resetTimer } = useWorkoutContext();
+  const [showFinishSheet, setShowFinishSheet] = useState(false);
+
   const { monday } = getWeekBounds();
 
   const weekEnd = new Date(monday + 'T00:00:00');
@@ -555,19 +866,40 @@ export function PlanView({ loading, weekWorkouts, historyWorkouts, markComplete,
     return `${d.getDate()} ${MONTH_ABBR[d.getMonth()]}`;
   })();
 
+  function openDetail(workout, dateStr) {
+    setSelectedWorkout(workout);
+    setSelectedDateStr(dateStr);
+  }
+
+  function closeDetail() {
+    setSelectedWorkout(null);
+    setSelectedDateStr('');
+  }
+
+  // Detiene el contexto + abre el sheet de finalización
+  function stopTimer() {
+    contextStopTimer();
+    setShowFinishSheet(true);
+  }
+
+  function handleFinishClose() {
+    setShowFinishSheet(false);
+    resetTimer();
+  }
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeContainer}>
+      <ScreenWrapper style={styles.safeContainer}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#00F0FF" />
           <Text style={styles.loadingText}>Cargando plan…</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
+    <ScreenWrapper style={styles.safeContainer}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -602,26 +934,48 @@ export function PlanView({ loading, weekWorkouts, historyWorkouts, markComplete,
         {activeTab === 'week' ? (
           <WeekTab
             weekWorkouts={weekWorkouts}
-            onComplete={markComplete}
             onGeneratePlan={handleGeneratePlan}
             isGenerating={isGenerating}
             onAddManual={() => setIsManualModalVisible(true)}
+            onOpenDetail={openDetail}
+            onStopTimer={stopTimer}
             styles={styles}
           />
         ) : (
           <HistoryTab
             historyWorkouts={historyWorkouts}
+            onOpenDetail={openDetail}
             styles={styles}
           />
         )}
       </ScrollView>
+
+      {/* Modals / Overlays */}
       <GeneratingOverlay visible={isGenerating} styles={styles} />
+
       <AddManualModal
         visible={isManualModalVisible}
         onClose={() => setIsManualModalVisible(false)}
         onSave={addManualWorkout}
         styles={styles}
       />
-    </SafeAreaView>
+
+      <WorkoutDetailSheet
+        visible={!!selectedWorkout}
+        workout={selectedWorkout}
+        dateStr={selectedDateStr}
+        onClose={closeDetail}
+        onComplete={markComplete}
+        styles={styles}
+      />
+
+      <TimerFinishSheet
+        visible={showFinishSheet}
+        totalSecs={timerSecs}
+        onClose={handleFinishClose}
+        onSave={saveTimerSession}
+        styles={styles}
+      />
+    </ScreenWrapper>
   );
 }

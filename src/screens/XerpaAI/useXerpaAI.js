@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../supabase';
+import { useDeviceContext } from '../../hooks/useDeviceContext';
+import { buildN8nPayload } from '../../utils/buildN8nPayload';
 
 const CHAT_ENDPOINT = 'https://untremulent-isoagglutinative-irving.ngrok-free.dev/webhook/chat';
 
@@ -22,6 +24,7 @@ function mapIntensityToColor(intensityHint) {
 }
 
 export function useXerpaAI(user) {
+  const { location, pushToken } = useDeviceContext();
   const [messages, setMessages] = useState([
     {
       id: '1',
@@ -62,17 +65,22 @@ export function useXerpaAI(user) {
     setLoading(true);
 
     try {
+      const body = buildN8nPayload({
+        userId: user.id,
+        mensaje: text,
+        rol,
+        location,
+        pushToken,
+        includeMessageAlias: true,
+      });
+
       const res = await fetch(CHAT_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'ngrok-skip-browser-warning': 'true',
         },
-        body: JSON.stringify({
-          user_id: user.id,
-          message: text,
-          rol,
-        }),
+        body: JSON.stringify(body),
       });
 
       const json = await res.json();
@@ -106,7 +114,7 @@ export function useXerpaAI(user) {
     } finally {
       setLoading(false);
     }
-  }, [input, user?.id, rol]);
+  }, [input, user?.id, rol, location, pushToken]);
 
   return {
     messages,

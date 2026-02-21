@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { useDashboard } from './useDashboard';
 import { DashboardView } from './DashboardView';
 import { dashboardStyles } from './DashboardStyles';
@@ -11,6 +12,8 @@ export default function DashboardScreen({ user }) {
     atl,
     tsb,
     tssSemanal,
+    tssPlaneadoSemanal,
+    tssProgressPct,
     entrenoHoy,
     hasData,
     hasReportedToday,
@@ -21,7 +24,25 @@ export default function DashboardScreen({ user }) {
     handleVincular,
     getRpeColor,
     rpeLabel,
+    motivationalMessage,
+    proximaCarrera,
+    diasParaCarrera,
   } = useDashboard(user);
+
+  const handleReportInjury = () => {
+    Alert.alert('Reporte de lesión 🩹', 'Notifica a XERPA AI sobre tu malestar para ajustar tu plan.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Ir a XERPA AI', onPress: () => {} },
+    ]);
+  };
+
+  const handleOpenXerpa = () => {
+    Alert.alert('PXERPA', 'Próximamente: acceso directo al chat con XERPA AI.');
+  };
+
+  const handleSyncData = () => {
+    Alert.alert('Sincronización', 'Próximamente: sincronización con Intervalos.icu y Strava.');
+  };
 
   return (
     <DashboardView
@@ -31,6 +52,8 @@ export default function DashboardScreen({ user }) {
       atl={atl}
       tsb={tsb}
       tssSemanal={tssSemanal}
+      tssPlaneadoSemanal={tssPlaneadoSemanal}
+      tssProgressPct={tssProgressPct}
       entrenoHoy={entrenoHoy}
       hasData={hasData}
       hasReportedToday={hasReportedToday}
@@ -41,6 +64,12 @@ export default function DashboardScreen({ user }) {
       getRpeColor={getRpeColor}
       rpeLabel={rpeLabel}
       onVincular={handleVincular}
+      motivationalMessage={motivationalMessage}
+      proximaCarrera={proximaCarrera}
+      diasParaCarrera={diasParaCarrera}
+      onReportInjury={handleReportInjury}
+      onOpenXerpa={handleOpenXerpa}
+      onSyncData={handleSyncData}
       styles={dashboardStyles}
     />
   );

@@ -6,7 +6,7 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenWrapper } from '../../components/ScreenWrapper';
 import { LinearGradient } from 'expo-linear-gradient';
 
 function GoogleIcon() {
@@ -32,7 +32,7 @@ export function SignUpView({
   const isAnyLoading = loadingGoogle || loadingApple;
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
+    <ScreenWrapper style={styles.safeContainer}>
       <View style={styles.container}>
       <Image
           source={require('../../../assets/logo.png')}
@@ -91,6 +91,6 @@ export function SignUpView({
           </Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }

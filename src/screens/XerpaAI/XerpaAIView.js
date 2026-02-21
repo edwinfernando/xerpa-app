@@ -9,7 +9,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenWrapper } from '../../components/ScreenWrapper';
 import { SendHorizontal } from 'lucide-react-native';
 
 function TypingIndicator({ styles }) {
@@ -54,7 +54,7 @@ export function XerpaAIView({ messages, input, setInput, loading, sendMessage, s
   const listData = loading ? [...messages] : messages;
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
+    <ScreenWrapper style={styles.safeContainer}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -93,6 +93,6 @@ export function XerpaAIView({ messages, input, setInput, loading, sendMessage, s
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }

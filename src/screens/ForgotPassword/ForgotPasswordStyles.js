@@ -1,16 +1,15 @@
 import { StyleSheet } from 'react-native';
+import { theme } from '../../styles/theme';
 
 export const forgotPasswordStyles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#121212',
   },
   container: {
     flex: 1,
-    backgroundColor: '#121212',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: theme.spacing.screenPadding,
   },
   iconContainer: {
     width: 72,
