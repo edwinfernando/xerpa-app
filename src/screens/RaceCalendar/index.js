@@ -11,6 +11,10 @@ export default function RaceCalendarScreen({ user }) {
     globalRaces,
     globalLoading,
     globalError,
+    filters,
+    setFilter,
+    filteredEventosXerpa,
+    filteredRutasLocales,
     addRace,
     deleteRace,
     updateRace,
@@ -27,6 +31,10 @@ export default function RaceCalendarScreen({ user }) {
       globalRaces={globalRaces}
       globalLoading={globalLoading}
       globalError={globalError}
+      filters={filters}
+      setFilter={setFilter}
+      filteredEventosXerpa={filteredEventosXerpa}
+      filteredRutasLocales={filteredRutasLocales}
       addRace={addRace}
       deleteRace={deleteRace}
       updateRace={updateRace}

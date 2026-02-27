@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
 import { supabase } from '../../../supabase';
 import { useDeviceContext } from '../../hooks/useDeviceContext';
+import { saveTodayPlan } from '../../services/offlineStorage';
 import { buildN8nPayload } from '../../utils/buildN8nPayload';
 
 // ⚠️ Reemplaza esta URL con tu endpoint de n8n
@@ -61,7 +62,23 @@ export function usePlan(user) {
     try {
       const { data, error } = await supabase
         .from('plan_entrenamientos')
-        .select('*')
+        .select(`
+          id,
+          user_id,
+          fecha,
+          tipo,
+          titulo,
+          detalle,
+          duracion_min,
+          tss_plan,
+          tss_real,
+          completado,
+          hora,
+          punto_encuentro,
+          is_generado_ia,
+          entrenador_id,
+          nota_atleta
+        `)
         .eq('user_id', user.id)
         .order('fecha', { ascending: false });
 
@@ -82,15 +99,34 @@ export function usePlan(user) {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  // Cache plan de hoy para uso offline (WorkoutActiveScreen)
+  useEffect(() => {
+    const hoy = getWeekBounds().today;
+    const planHoy = weekWorkouts.find(w => w.fecha === hoy) ?? null;
+    if (planHoy) saveTodayPlan(planHoy).catch(() => {});
+  }, [weekWorkouts]);
+
   const markComplete = async (id) => {
     const { error } = await supabase
       .from('plan_entrenamientos')
       .update({ completado: true })
       .eq('id', id);
     if (error) throw error;
-    setWeekWorkouts(prev =>
-      prev.map(w => w.id === id ? { ...w, completado: true } : w)
-    );
+    const updater = (w) => (w.id === id ? { ...w, completado: true } : w);
+    setWeekWorkouts(prev => prev.map(updater));
+    setHistoryWorkouts(prev => prev.map(updater));
+  };
+
+  const saveFeedback = async (id, nota_atleta) => {
+    const payload = { completado: true, nota_atleta: nota_atleta?.trim() || null };
+    const { error } = await supabase
+      .from('plan_entrenamientos')
+      .update(payload)
+      .eq('id', id);
+    if (error) throw error;
+    const updater = (w) => (w.id === id ? { ...w, ...payload } : w);
+    setWeekWorkouts(prev => prev.map(updater));
+    setHistoryWorkouts(prev => prev.map(updater));
   };
 
   const saveTimerSession = async ({ duracion_seg, rpe }) => {
@@ -117,6 +153,8 @@ export function usePlan(user) {
         duracion_min: formData.duracion_min ? parseInt(formData.duracion_min, 10) : null,
         tss_plan: formData.tss_plan ? parseFloat(formData.tss_plan) : null,
         detalle: formData.detalle || null,
+        hora: formData.hora?.trim() || null,
+        punto_encuentro: formData.punto_encuentro?.trim() || null,
         estado: 'Programada',
         completado: false,
       });
@@ -128,23 +166,33 @@ export function usePlan(user) {
   const handleGeneratePlan = async () => {
     setIsGenerating(true);
     try {
-      // Obtener usuario autenticado
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
       if (authError || !authUser) throw new Error('Usuario no autenticado');
 
-      // Obtener rol del usuario
-      const { data: userData } = await supabase
-        .from('usuarios')
-        .select('rol')
-        .eq('id', authUser.id)
-        .maybeSingle();
+      const [userRes, carrerasRes] = await Promise.all([
+        supabase.from('usuarios').select('rol').eq('id', authUser.id).maybeSingle(),
+        supabase
+          .from('usuario_carreras')
+          .select('prioridad, carreras(nombre, distancia_km, desnivel_m, tss_estimado)')
+          .eq('user_id', authUser.id)
+          .eq('preparar_con_xerpa', true)
+          .order('prioridad'),
+      ]);
+
+      const carreraContext = (carrerasRes?.data ?? [])
+        .filter((uc) => uc.carreras)
+        .map((uc) => ({
+          ...(typeof uc.carreras === 'object' ? uc.carreras : {}),
+          prioridad: uc.prioridad ?? 'B',
+        }));
 
       const body = buildN8nPayload({
         userId: authUser.id,
         mensaje: 'Generar plan semanal automático',
-        rol: userData?.rol ?? 'Atleta',
+        rol: userRes?.data?.rol ?? 'Atleta',
         location,
         pushToken,
+        carreraContext,
       });
 
       const response = await fetch(N8N_WEBHOOK_URL, {
@@ -177,6 +225,7 @@ export function usePlan(user) {
     historyWorkouts,
     isGenerating,
     markComplete,
+    saveFeedback,
     handleGeneratePlan,
     addManualWorkout,
     saveTimerSession,

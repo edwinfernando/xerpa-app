@@ -15,17 +15,19 @@ import { ScreenWrapper } from '../../components/ScreenWrapper';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Plus, Calendar, MapPin, Mountain, TrendingUp,
-  Trophy, Flag, AlertCircle, Trash2,
+  Trophy, Flag, AlertCircle, MountainSnow, Route,
 } from 'lucide-react-native';
 import { formatDateRange } from '../../utils/formatDateRange';
-import { getRaceAccentColor } from '../../utils/raceColorByNome';
 import { showXerpaError } from '../../utils/ErrorHandler';
+import { TABS } from './useRaceCalendar';
+import { SmartRaceCard } from './components/SmartRaceCard';
+import { EventFilters } from './components/EventFilters';
+import { FilterBottomSheet } from './components/FilterBottomSheet';
+import { RaceDetailSheet } from './components/RaceDetailSheet';
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
-
-/** Días hasta fecha_inicio (cuando el atleta viaja o empieza las gymcanas). */
 function getDaysUntil(fechaInicioStr) {
   if (!fechaInicioStr) return null;
   const today = new Date();
@@ -35,191 +37,20 @@ function getDaysUntil(fechaInicioStr) {
 }
 
 const DATE_REGEX = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
-const EMPTY_FORM = { nombre: '', fecha_inicio: '', fecha_fin: '', ciudad: '', distancia_km: '', desnivel_m: '' };
-
-// ─────────────────────────────────────────────────────────────
-// StatusBadge
-// ─────────────────────────────────────────────────────────────
-function StatusBadge({ estado, styles }) {
-  const isActiva = estado === 'Activa';
-  const isFinalizada = estado === 'Finalizada';
-  return (
-    <View style={[
-      styles.badge,
-      isActiva ? styles.badgeActiva : isFinalizada ? styles.badgeFinalizada : styles.badgeProgramada,
-    ]}>
-      <Text style={[
-        styles.badgeText,
-        isActiva ? styles.badgeTextActiva : isFinalizada ? styles.badgeTextFinalizada : styles.badgeTextProgramada,
-      ]}>
-        {estado ?? 'Programada'}
-      </Text>
-    </View>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// CountdownPill
-// ─────────────────────────────────────────────────────────────
-function CountdownPill({ fechaInicio, estado, styles }) {
-  if (estado === 'Finalizada') return null;
-  const days = getDaysUntil(fechaInicio);
-  if (days === null || days < 0) return null;
-
-  const isToday = days === 0;
-
-  return (
-    <View style={[styles.countdownPill, isToday && styles.countdownPillToday]}>
-      <Text style={[styles.countdownPillText, isToday && styles.countdownPillTextToday]}>
-        {isToday ? '¡HOY!' : `${days}d`}
-      </Text>
-    </View>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// RaceCard — Reutilizable para mis-carreras y calendario-global
-// ─────────────────────────────────────────────────────────────
-function RaceCard({ item, variant = 'mine', isEnrolled, onDelete, onPress, styles }) {
-  const isActiva = item.estado === 'Activa';
-  const isFinalizada = item.estado === 'Finalizada';
-  const isProgramada = !isActiva && !isFinalizada;
-  const isGlobal = variant === 'global';
-
-  const baseColor = getRaceAccentColor(item.nombre);
-  const accentColor = isFinalizada ? '#2A2A2A' : baseColor;
-  const hasMetrics = item.distancia_km != null || item.desnivel_m != null;
-
-  const cardContent = (
-    <View style={[styles.cardContent, { borderLeftWidth: 4, borderLeftColor: accentColor }]}>
-        {/* Top row: name + countdown + delete / inscrito badge */}
-        <View style={styles.cardTopRow}>
-          <View style={{ flex: 1 }}>
-            <Text
-              style={[
-                styles.raceName,
-                isFinalizada && styles.raceNameFinalizada,
-                !isFinalizada && { color: baseColor },
-              ]}
-              numberOfLines={2}
-            >
-              {item.nombre ?? 'Sin nombre'}
-            </Text>
-            {isGlobal && isEnrolled && (
-              <Text style={styles.inscritoBadge}>✅ Inscrito</Text>
-            )}
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <CountdownPill fechaInicio={item.fecha_inicio} estado={item.estado ?? 'Programada'} styles={styles} />
-            {isGlobal ? null : onDelete && (
-              <TouchableOpacity
-                onPress={() => {
-                  const id = item.id ?? item.inscripcion_id;
-                  if (!id) return;
-                  Alert.alert(
-                    'Eliminar carrera',
-                    `¿Quitar "${item.nombre ?? 'esta carrera'}" de tu calendario?`,
-                    [
-                      { text: 'Cancelar', style: 'cancel' },
-                      {
-                        text: 'Eliminar',
-                        style: 'destructive',
-                        onPress: async () => {
-                          try {
-                            await onDelete(id);
-                          } catch (e) {
-                            showXerpaError(e, 'RACE-DEL-02');
-                          }
-                        },
-                      },
-                    ]
-                  );
-                }}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                style={{ padding: 4 }}
-              >
-                <Trash2 color="#555" size={18} />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        {/* Status badge (solo mis-carreras) */}
-        {!isGlobal && <StatusBadge estado={item.estado} styles={styles} />}
-
-        {/* Date range */}
-        <View style={[styles.infoRow, { marginTop: 10 }]}>
-          <Calendar color="#555" size={13} />
-          <Text style={styles.infoText}>
-            <Text style={styles.infoTextHighlight}>
-              {formatDateRange(item.fecha_inicio, item.fecha_fin)}
-            </Text>
-          </Text>
-        </View>
-
-        {/* City */}
-        {!!item.ciudad && (
-          <View style={styles.infoRow}>
-            <MapPin color="#555" size={13} />
-            <Text style={styles.infoText}>{item.ciudad}</Text>
-          </View>
-        )}
-
-        {/* Metrics */}
-        {hasMetrics && (
-          <>
-            <View style={styles.divider} />
-            <View style={styles.metricsRow}>
-              {item.distancia_km != null && (
-                <View style={styles.metricItem}>
-                  <TrendingUp color="#555" size={13} />
-                  <Text style={styles.metricValue}>{item.distancia_km}</Text>
-                  <Text style={styles.metricLabel}>km</Text>
-                </View>
-              )}
-              {item.desnivel_m != null && (
-                <View style={styles.metricItem}>
-                  <Mountain color="#555" size={13} />
-                  <Text style={styles.metricValue}>{item.desnivel_m}</Text>
-                  <Text style={styles.metricLabel}>m D+</Text>
-                </View>
-              )}
-            </View>
-          </>
-        )}
-
-        {/* Result (solo mis-carreras finalizadas) */}
-        {!isGlobal && isFinalizada && item.resultado && (
-          <View style={styles.resultRow}>
-            <Flag color="#444" size={12} />
-            <Text style={styles.resultLabel}>Resultado:</Text>
-            <Text style={styles.resultValue}>{item.resultado}</Text>
-          </View>
-        )}
-    </View>
-  );
-
-  const Wrapper = isGlobal && onPress ? TouchableOpacity : View;
-  const wrapperProps = isGlobal && onPress
-    ? { onPress: () => onPress(item), activeOpacity: 0.8 }
-    : {};
-
-  return (
-    <Wrapper {...wrapperProps} style={[styles.card, isFinalizada && { opacity: 0.55 }]}>
-      {cardContent}
-    </Wrapper>
-  );
-}
+const EMPTY_FORM = {
+  nombre: '', fecha_inicio: '', fecha_fin: '', ciudad: '',
+  distancia_km: '', desnivel_m: '', prioridad: 'B', pais: '',
+  tipo_evento: 'ruta_local', tipo_deporte: '', tss_estimado: '',
+};
 
 // ─────────────────────────────────────────────────────────────
 // StatsStrip
 // ─────────────────────────────────────────────────────────────
 function StatsStrip({ races, styles }) {
   const total = races.length;
-  const upcoming = races.filter(r => r.estado !== 'Finalizada').length;
+  const upcoming = races.filter((r) => r.estado !== 'Finalizada').length;
   const totalKm = races.reduce((s, r) => s + (Number(r.distancia_km) || 0), 0);
-
-  const next = races.find(r => r.estado !== 'Finalizada');
+  const next = races.find((r) => r.estado !== 'Finalizada');
   const daysNext = next ? getDaysUntil(next.fecha_inicio) : null;
 
   if (total === 0) return null;
@@ -261,7 +92,7 @@ function AddRaceModal({ visible, onClose, onSave, styles }) {
   const [saving, setSaving] = useState(false);
 
   function setField(field, value) {
-    setForm(prev => ({ ...prev, [field]: value }));
+    setForm((prev) => ({ ...prev, [field]: value }));
     if (field === 'nombre' && nombreError) setNombreError('');
     if (field === 'fecha_inicio' && fechaInicioError) setFechaInicioError('');
     if (field === 'fecha_fin' && fechaFinError) setFechaFinError('');
@@ -275,7 +106,10 @@ function AddRaceModal({ visible, onClose, onSave, styles }) {
     setSaving(false);
   }
 
-  function handleClose() { reset(); onClose(); }
+  function handleClose() {
+    reset();
+    onClose();
+  }
 
   async function handleSave() {
     let hasError = false;
@@ -287,7 +121,7 @@ function AddRaceModal({ visible, onClose, onSave, styles }) {
       setFechaInicioError('La fecha de inicio es obligatoria.');
       hasError = true;
     } else if (!DATE_REGEX.test(form.fecha_inicio.trim())) {
-      setFechaInicioError('Usa el formato AAAA-MM-DD (ej. 2026-10-15).');
+      setFechaInicioError('Usa el formato AAAA-MM-DD.');
       hasError = true;
     }
     if (form.fecha_fin.trim() && !DATE_REGEX.test(form.fecha_fin.trim())) {
@@ -296,7 +130,7 @@ function AddRaceModal({ visible, onClose, onSave, styles }) {
     }
     if (form.fecha_inicio.trim() && form.fecha_fin.trim()) {
       if (new Date(form.fecha_fin) < new Date(form.fecha_inicio)) {
-        setFechaFinError('La fecha fin debe ser igual o posterior a la de inicio.');
+        setFechaFinError('La fecha fin debe ser igual o posterior.');
         hasError = true;
       }
     }
@@ -309,7 +143,7 @@ function AddRaceModal({ visible, onClose, onSave, styles }) {
       onClose();
     } catch (err) {
       showXerpaError(err, 'RACE-ADD-01');
-      setFechaInicioError(err?.message ?? 'Error al guardar.');
+      setNombreError(err?.message ?? 'Error al guardar.');
     } finally {
       setSaving(false);
     }
@@ -324,32 +158,29 @@ function AddRaceModal({ visible, onClose, onSave, styles }) {
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={handleClose} />
         <View style={styles.sheetContainer}>
           <View style={styles.sheetHandle} />
-
           <View style={styles.sheetTitleRow}>
             <Trophy color="#00F0FF" size={20} />
             <Text style={styles.sheetTitle}>Nueva Carrera</Text>
           </View>
-          <Text style={styles.sheetSubtitle}>Añade tu próximo objetivo al calendario.</Text>
+          <Text style={styles.sheetSubtitle}>Añade tu próximo objetivo. Prioridad A/B/C para la IA.</Text>
 
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {/* Nombre */}
             <Text style={styles.formLabel}>Nombre del evento *</Text>
             <TextInput
               style={[styles.formInput, !!nombreError && styles.formInputError]}
               value={form.nombre}
-              onChangeText={v => setField('nombre', v)}
+              onChangeText={(v) => setField('nombre', v)}
               placeholder="Ej. XCO Copa Andalucía"
               placeholderTextColor="#333"
               editable={!saving}
             />
             {!!nombreError && <Text style={styles.formHelperText}>{nombreError}</Text>}
 
-            {/* Fecha inicio */}
             <Text style={styles.formLabel}>Fecha inicio *</Text>
             <TextInput
               style={[styles.formInput, !!fechaInicioError && styles.formInputError]}
               value={form.fecha_inicio}
-              onChangeText={v => setField('fecha_inicio', v)}
+              onChangeText={(v) => setField('fecha_inicio', v)}
               placeholder="AAAA-MM-DD"
               placeholderTextColor="#333"
               keyboardType="numbers-and-punctuation"
@@ -357,59 +188,90 @@ function AddRaceModal({ visible, onClose, onSave, styles }) {
             />
             {!!fechaInicioError && <Text style={styles.formHelperText}>{fechaInicioError}</Text>}
 
-            {/* Fecha fin (opcional - eventos multi-día) */}
             <Text style={styles.formLabel}>Fecha fin (opcional)</Text>
             <TextInput
               style={[styles.formInput, !!fechaFinError && styles.formInputError]}
               value={form.fecha_fin}
-              onChangeText={v => setField('fecha_fin', v)}
-              placeholder="AAAA-MM-DD — dejar vacío si es un solo día"
+              onChangeText={(v) => setField('fecha_fin', v)}
+              placeholder="AAAA-MM-DD"
               placeholderTextColor="#333"
               keyboardType="numbers-and-punctuation"
               editable={!saving}
             />
             {!!fechaFinError && <Text style={styles.formHelperText}>{fechaFinError}</Text>}
 
-            {/* Ciudad */}
-            <Text style={styles.formLabel}>Ciudad</Text>
+            <Text style={styles.formLabel}>Ciudad / País</Text>
+            <View style={styles.formRow}>
+              <TextInput
+                style={[styles.formRowItem, styles.formInput]}
+                value={form.ciudad}
+                onChangeText={(v) => setField('ciudad', v)}
+                placeholder="Ciudad"
+                placeholderTextColor="#333"
+                editable={!saving}
+              />
+              <TextInput
+                style={[styles.formRowItem, styles.formInput]}
+                value={form.pais}
+                onChangeText={(v) => setField('pais', v)}
+                placeholder="País"
+                placeholderTextColor="#333"
+                editable={!saving}
+              />
+            </View>
+
+            <Text style={styles.formLabel}>Distancia (km) / Desnivel (m D+)</Text>
+            <View style={styles.formRow}>
+              <TextInput
+                style={[styles.formRowItem, styles.formInput]}
+                value={form.distancia_km}
+                onChangeText={(v) => setField('distancia_km', v)}
+                placeholder="80"
+                placeholderTextColor="#333"
+                keyboardType="numeric"
+                editable={!saving}
+              />
+              <TextInput
+                style={[styles.formRowItem, styles.formInput]}
+                value={form.desnivel_m}
+                onChangeText={(v) => setField('desnivel_m', v)}
+                placeholder="2400"
+                placeholderTextColor="#333"
+                keyboardType="numeric"
+                editable={!saving}
+              />
+            </View>
+
+            <Text style={styles.formLabel}>TSS estimado (para XERPA Readiness)</Text>
             <TextInput
               style={styles.formInput}
-              value={form.ciudad}
-              onChangeText={v => setField('ciudad', v)}
-              placeholder="Ej. Granada, España"
+              value={form.tss_estimado}
+              onChangeText={(v) => setField('tss_estimado', v)}
+              placeholder="Ej. 85"
               placeholderTextColor="#333"
+              keyboardType="numeric"
               editable={!saving}
             />
 
-            {/* Distancia + Desnivel */}
-            <View style={styles.formRow}>
-              <View style={styles.formRowItem}>
-                <Text style={[styles.formLabel, { marginTop: 0 }]}>Distancia (km)</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={form.distancia_km}
-                  onChangeText={v => setField('distancia_km', v)}
-                  placeholder="Ej. 80"
-                  placeholderTextColor="#333"
-                  keyboardType="numeric"
-                  editable={!saving}
-                />
-              </View>
-              <View style={styles.formRowItem}>
-                <Text style={[styles.formLabel, { marginTop: 0 }]}>Desnivel (m)</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={form.desnivel_m}
-                  onChangeText={v => setField('desnivel_m', v)}
-                  placeholder="Ej. 2400"
-                  placeholderTextColor="#333"
-                  keyboardType="numeric"
-                  editable={!saving}
-                />
-              </View>
+            <Text style={styles.formLabel}>Prioridad (A=objetivo principal, B, C)</Text>
+            <View style={[styles.formRow, { gap: 8 }]}>
+              {['A', 'B', 'C'].map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  style={[
+                    styles.filterChip,
+                    form.prioridad === p && styles.filterChipActive,
+                    { flex: 1 },
+                  ]}
+                  onPress={() => setField('prioridad', p)}
+                >
+                  <Text style={[styles.filterChipText, form.prioridad === p && styles.filterChipTextActive]}>
+                    {p}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
-            {/* Actions */}
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancelBtn} onPress={handleClose} disabled={saving}>
                 <Text style={styles.modalCancelText}>Cancelar</Text>
@@ -421,141 +283,17 @@ function AddRaceModal({ visible, onClose, onSave, styles }) {
                 style={styles.modalSaveGradient}
               >
                 <TouchableOpacity style={styles.modalSaveBtn} onPress={handleSave} disabled={saving}>
-                  {saving
-                    ? <ActivityIndicator color="#0D0D0D" size="small" />
-                    : <Text style={styles.modalSaveText}>💾 Guardar Carrera</Text>
-                  }
+                  {saving ? (
+                    <ActivityIndicator color="#0D0D0D" size="small" />
+                  ) : (
+                    <Text style={styles.modalSaveText}>💾 Guardar Carrera</Text>
+                  )}
                 </TouchableOpacity>
               </LinearGradient>
             </View>
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
-    </Modal>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// GlobalRaceDetailSheet — BottomSheet dinámico Inscribir / Cancelar
-// ─────────────────────────────────────────────────────────────
-function GlobalRaceDetailSheet({ visible, carrera, isEnrolled, onClose, onEnroll, onUnenroll, styles }) {
-  const [loading, setLoading] = useState(false);
-
-  if (!carrera) return null;
-
-  const hasMetrics = carrera.distancia_km != null || carrera.desnivel_m != null;
-
-  async function handleEnroll() {
-    setLoading(true);
-    try {
-      await onEnroll(carrera.id);
-      onClose();
-      Alert.alert('¡Inscrito! 🏁', 'La carrera se añadió a tu calendario.');
-    } catch (e) {
-      showXerpaError(e, 'RACE-INS-01');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function handleUnenrollPress() {
-    Alert.alert(
-      'Cancelar inscripción',
-      '¿Estás seguro que deseas retirarte de esta carrera?',
-      [
-        { text: 'No', style: 'cancel' },
-        { text: 'Sí, retirarme', style: 'destructive', onPress: handleUnenroll },
-      ]
-    );
-  }
-
-  async function handleUnenroll() {
-    setLoading(true);
-    try {
-      await onUnenroll(carrera.id);
-      onClose();
-      Alert.alert('Inscripción cancelada', 'Te has retirado de la carrera.');
-    } catch (e) {
-      showXerpaError(e, 'RACE-DEL-01');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.sheetOverlay}>
-        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
-        <View style={styles.detailSheet}>
-          <View style={styles.detailHandle} />
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.sheetTitle}>{carrera.nombre ?? 'Carrera'}</Text>
-            <View style={[styles.infoRow, { marginTop: 8 }]}>
-              <Calendar color="#00F0FF" size={14} />
-              <Text style={styles.infoTextHighlight}>
-                {formatDateRange(carrera.fecha_inicio, carrera.fecha_fin)}
-              </Text>
-            </View>
-            {!!carrera.ciudad && (
-              <View style={styles.infoRow}>
-                <MapPin color="#555" size={14} />
-                <Text style={styles.infoText}>{carrera.ciudad}</Text>
-              </View>
-            )}
-            {hasMetrics && (
-              <View style={styles.metricsRow}>
-                {carrera.distancia_km != null && (
-                  <View style={styles.metricItem}>
-                    <TrendingUp color="#555" size={13} />
-                    <Text style={styles.metricValue}>{carrera.distancia_km}</Text>
-                    <Text style={styles.metricLabel}>km</Text>
-                  </View>
-                )}
-                {carrera.desnivel_m != null && (
-                  <View style={styles.metricItem}>
-                    <Mountain color="#555" size={13} />
-                    <Text style={styles.metricValue}>{carrera.desnivel_m}</Text>
-                    <Text style={styles.metricLabel}>m D+</Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {isEnrolled ? (
-              <TouchableOpacity
-                style={styles.detailCancelBtn}
-                onPress={handleUnenrollPress}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#ff5252" size="small" />
-                ) : (
-                  <Text style={styles.detailCancelBtnText}>Cancelar Inscripción</Text>
-                )}
-              </TouchableOpacity>
-            ) : (
-              <LinearGradient
-                colors={['#00F0FF', '#39FF14']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.detailEnrollBtn}
-              >
-                <TouchableOpacity
-                  style={{ paddingVertical: 4, paddingHorizontal: 24 }}
-                  onPress={handleEnroll}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="#0D0D0D" size="small" />
-                  ) : (
-                    <Text style={styles.modalSaveText}>Inscribirme a esta Carrera</Text>
-                  )}
-                </TouchableOpacity>
-              </LinearGradient>
-            )}
-          </ScrollView>
-        </View>
-      </View>
     </Modal>
   );
 }
@@ -588,7 +326,7 @@ function EmptyState({ onAdd, styles }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// RaceCalendarView (principal)
+// RaceCalendarView
 // ─────────────────────────────────────────────────────────────
 export function RaceCalendarView({
   races,
@@ -597,6 +335,10 @@ export function RaceCalendarView({
   globalRaces,
   globalLoading,
   globalError,
+  filters,
+  setFilter,
+  filteredEventosXerpa,
+  filteredRutasLocales,
   addRace,
   deleteRace,
   updateRace,
@@ -605,31 +347,27 @@ export function RaceCalendarView({
   unenrollFromRace,
   styles,
 }) {
-  const [activeTab, setActiveTab] = useState('mis-carreras');
+  const [activeTab, setActiveTab] = useState(TABS.MI_CALENDARIO);
   const [modalVisible, setModalVisible] = useState(false);
-  const [globalDetailCarrera, setGlobalDetailCarrera] = useState(null);
+  const [filterSheetVisible, setFilterSheetVisible] = useState(false);
+  const [detailCarrera, setDetailCarrera] = useState(null);
 
   useEffect(() => {
-    if (activeTab === 'calendario-global') {
+    if (activeTab === TABS.EVENTOS_XERPA || activeTab === TABS.RUTAS_LOCALES) {
       fetchGlobalRaces();
     }
   }, [activeTab, fetchGlobalRaces]);
 
   function isEnrolledIn(carreraId) {
-    return races.some(r => r.carrera_id === carreraId);
+    return races.some((r) => r.carrera_id === carreraId || r.id === carreraId);
   }
 
-  function handleOpenGlobalDetail(carrera) {
-    setGlobalDetailCarrera(carrera);
+  function handleOpenDetail(carrera) {
+    setDetailCarrera(carrera);
   }
 
-  async function handleEnroll(carreraId) {
-    await enrollToRace(carreraId);
-  }
-
-  async function handleUnenroll(carreraId) {
-    await unenrollFromRace(carreraId);
-  }
+  const showFilters = activeTab === TABS.EVENTOS_XERPA || activeTab === TABS.RUTAS_LOCALES;
+  const hasActiveFilters = !!(filters.pais?.trim() || filters.tipoDeporte?.trim() || filters.nivelDificultad !== '');
 
   return (
     <ScreenWrapper style={styles.safeContainer}>
@@ -637,17 +375,13 @@ export function RaceCalendarView({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerLabel}>Mis Objetivos</Text>
-            <Text style={styles.headerTitle}>Calendario de Carreras</Text>
+            <Text style={styles.headerLabel}>Marketplace de Eventos</Text>
+            <Text style={styles.headerTitle}>Carreras</Text>
           </View>
-          {activeTab === 'mis-carreras' && (
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => setModalVisible(true)}
-            >
+          {activeTab === TABS.MI_CALENDARIO && (
+            <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
               <LinearGradient
                 colors={['#00F0FF', '#39FF14']}
                 start={{ x: 0, y: 0.5 }}
@@ -660,28 +394,59 @@ export function RaceCalendarView({
           )}
         </View>
 
-        {/* Segmented Control */}
+        {/* Tabs: Mi calendario | Carreras | Eventos (iconos + labels para usabilidad) */}
         <View style={styles.segmented}>
           <TouchableOpacity
-            style={[styles.segmentBtn, activeTab === 'mis-carreras' && styles.segmentBtnActive]}
-            onPress={() => setActiveTab('mis-carreras')}
+            style={[styles.segmentBtn, activeTab === TABS.MI_CALENDARIO && styles.segmentBtnActive]}
+            onPress={() => setActiveTab(TABS.MI_CALENDARIO)}
           >
-            <Text style={[styles.segmentText, activeTab === 'mis-carreras' && styles.segmentTextActive]}>
-              Mis Carreras
+            <Calendar color={activeTab === TABS.MI_CALENDARIO ? '#121212' : '#555'} size={16} />
+            <Text style={[styles.segmentText, activeTab === TABS.MI_CALENDARIO && styles.segmentTextActive]}>
+              Mi calendario
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.segmentBtn, activeTab === 'calendario-global' && styles.segmentBtnActive]}
-            onPress={() => setActiveTab('calendario-global')}
+            style={[styles.segmentBtn, activeTab === TABS.EVENTOS_XERPA && styles.segmentBtnActive]}
+            onPress={() => setActiveTab(TABS.EVENTOS_XERPA)}
           >
-            <Text style={[styles.segmentText, activeTab === 'calendario-global' && styles.segmentTextActive]}>
-              Calendario Global
+            <Trophy color={activeTab === TABS.EVENTOS_XERPA ? '#121212' : '#555'} size={16} />
+            <Text style={[styles.segmentText, activeTab === TABS.EVENTOS_XERPA && styles.segmentTextActive]}>
+              Carreras
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeTab === TABS.RUTAS_LOCALES && styles.segmentBtnActive]}
+            onPress={() => setActiveTab(TABS.RUTAS_LOCALES)}
+          >
+            <Route color={activeTab === TABS.RUTAS_LOCALES ? '#121212' : '#555'} size={16} />
+            <Text style={[styles.segmentText, activeTab === TABS.RUTAS_LOCALES && styles.segmentTextActive]}>
+              Eventos
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Tab: Mis Carreras */}
-        {activeTab === 'mis-carreras' && (
+        {showFilters && (
+          <EventFilters
+            filters={filters}
+            setFilter={setFilter}
+            onOpenFilters={() => setFilterSheetVisible(true)}
+            hasActiveFilters={hasActiveFilters}
+            styles={styles}
+          />
+        )}
+
+        {showFilters && (
+          <FilterBottomSheet
+            visible={filterSheetVisible}
+            onClose={() => setFilterSheetVisible(false)}
+            filters={filters}
+            setFilter={setFilter}
+            styles={styles}
+          />
+        )}
+
+        {/* Tab: Mi Calendario */}
+        {activeTab === TABS.MI_CALENDARIO && (
           <>
             {!loading && !error && <StatsStrip races={races} styles={styles} />}
             {loading && (
@@ -697,32 +462,32 @@ export function RaceCalendarView({
               </View>
             )}
             {!loading && !error && (
-              races.length === 0
-                ? <EmptyState onAdd={() => setModalVisible(true)} styles={styles} />
-                : (
-                  <View style={styles.list}>
-                    {races.map(item => (
-                      <RaceCard
-                        key={String(item.id ?? item.inscripcion_id)}
-                        item={item}
-                        variant="mine"
-                        onDelete={deleteRace}
-                        styles={styles}
-                      />
-                    ))}
-                  </View>
-                )
+              races.length === 0 ? (
+                <EmptyState onAdd={() => setModalVisible(true)} styles={styles} />
+              ) : (
+                <View style={styles.list}>
+                  {races.map((item) => (
+                    <SmartRaceCard
+                      key={String(item.id ?? item.inscripcion_id)}
+                      item={item}
+                      variant="mine"
+                      onDelete={deleteRace}
+                      styles={styles}
+                    />
+                  ))}
+                </View>
+              )
             )}
           </>
         )}
 
-        {/* Tab: Calendario Global */}
-        {activeTab === 'calendario-global' && (
+        {/* Tab: Eventos XERPA */}
+        {activeTab === TABS.EVENTOS_XERPA && (
           <>
             {globalLoading && (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#00F0FF" />
-                <Text style={styles.loadingText}>Cargando calendario...</Text>
+                <Text style={styles.loadingText}>Cargando eventos...</Text>
               </View>
             )}
             {!globalLoading && !!globalError && (
@@ -732,32 +497,74 @@ export function RaceCalendarView({
               </View>
             )}
             {!globalLoading && !globalError && (
-              globalRaces.length === 0
-                ? (
-                  <View style={styles.emptyContainer}>
-                    <View style={styles.emptyIconWrap}>
-                      <Trophy color="#00F0FF" size={34} />
-                    </View>
-                    <Text style={styles.emptyTitle}>Sin carreras en el catálogo</Text>
-                    <Text style={styles.emptyText}>
-                      Pronto añadiremos más eventos. Prueba la pestaña Mis Carreras para añadir la tuya.
-                    </Text>
+              filteredEventosXerpa.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <View style={styles.emptyIconWrap}>
+                    <Trophy color="#00F0FF" size={34} />
                   </View>
-                )
-                : (
-                  <View style={styles.list}>
-                    {globalRaces.map(item => (
-                      <RaceCard
-                        key={String(item.id)}
-                        item={item}
-                        variant="global"
-                        isEnrolled={isEnrolledIn(item.id)}
-                        onPress={handleOpenGlobalDetail}
-                        styles={styles}
-                      />
-                    ))}
+                  <Text style={styles.emptyTitle}>Sin eventos verificados</Text>
+                  <Text style={styles.emptyText}>
+                    Pronto añadiremos carreras oficiales. Revisa Rutas Locales o añade la tuya en Mi Calendario.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.list}>
+                  {filteredEventosXerpa.map((item) => (
+                    <SmartRaceCard
+                      key={String(item.id)}
+                      item={item}
+                      variant="global"
+                      isEnrolled={isEnrolledIn(item.id)}
+                      onPress={handleOpenDetail}
+                      styles={styles}
+                    />
+                  ))}
+                </View>
+              )
+            )}
+          </>
+        )}
+
+        {/* Tab: Rutas Locales */}
+        {activeTab === TABS.RUTAS_LOCALES && (
+          <>
+            {globalLoading && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#00F0FF" />
+                <Text style={styles.loadingText}>Cargando rutas...</Text>
+              </View>
+            )}
+            {!globalLoading && !!globalError && (
+              <View style={styles.errorContainer}>
+                <AlertCircle color="#ff5252" size={32} />
+                <Text style={styles.errorText}>{globalError}</Text>
+              </View>
+            )}
+            {!globalLoading && !globalError && (
+              filteredRutasLocales.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <View style={styles.emptyIconWrap}>
+                    <MountainSnow color="#00F0FF" size={34} />
                   </View>
-                )
+                  <Text style={styles.emptyTitle}>Sin rutas locales</Text>
+                  <Text style={styles.emptyText}>
+                    Eventos de comunidad o travesías menores aparecerán aquí. Añade la tuya en Mi Calendario.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.list}>
+                  {filteredRutasLocales.map((item) => (
+                    <SmartRaceCard
+                      key={String(item.id)}
+                      item={item}
+                      variant="global"
+                      isEnrolled={isEnrolledIn(item.id)}
+                      onPress={handleOpenDetail}
+                      styles={styles}
+                    />
+                  ))}
+                </View>
+              )
             )}
           </>
         )}
@@ -770,13 +577,13 @@ export function RaceCalendarView({
         styles={styles}
       />
 
-      <GlobalRaceDetailSheet
-        visible={!!globalDetailCarrera}
-        carrera={globalDetailCarrera}
-        isEnrolled={globalDetailCarrera ? isEnrolledIn(globalDetailCarrera.id) : false}
-        onClose={() => setGlobalDetailCarrera(null)}
-        onEnroll={handleEnroll}
-        onUnenroll={handleUnenroll}
+      <RaceDetailSheet
+        visible={!!detailCarrera}
+        carrera={detailCarrera}
+        isEnrolled={detailCarrera ? isEnrolledIn(detailCarrera.id) : false}
+        onClose={() => setDetailCarrera(null)}
+        onEnroll={enrollToRace}
+        onUnenroll={unenrollFromRace}
         styles={styles}
       />
     </ScreenWrapper>
