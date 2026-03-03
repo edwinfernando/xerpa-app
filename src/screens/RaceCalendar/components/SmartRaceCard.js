@@ -1,11 +1,11 @@
 /**
- * SmartRaceCard — Card de carrera (diseño anterior / simple)
- * - Nombre, fecha, ciudad
- * - Distancia y desnivel D+
- * - Status badge, countdown, inscrito badge
+ * SmartRaceCard — Card de carrera
+ * - imagen_url o circuito_logo, circuito_nombre
+ * - Nombre, fecha, ciudad, métricas
+ * - Status badge (Activa/Finalizada), countdown, inscrito badge
  */
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { Calendar, MapPin, Mountain, TrendingUp, Trash2 } from 'lucide-react-native';
 import { formatDateRange } from '../../../utils/formatDateRange';
 import { getRaceAccentColor } from '../../../utils/raceColorByNome';
@@ -27,6 +27,7 @@ function getDaysUntil(fechaInicioStr) {
 }
 
 function StatusBadge({ estado, styles }) {
+  if (!estado || estado === 'Programada') return null;
   const isActiva = estado === 'Activa';
   const isFinalizada = estado === 'Finalizada';
   return (
@@ -38,7 +39,7 @@ function StatusBadge({ estado, styles }) {
         styles.badgeText,
         isActiva ? styles.badgeTextActiva : isFinalizada ? styles.badgeTextFinalizada : styles.badgeTextProgramada,
       ]}>
-        {estado ?? 'Programada'}
+        {estado}
       </Text>
     </View>
   );
@@ -76,6 +77,9 @@ export function SmartRaceCard({
   const accentColor = isFinalizada ? '#2A2A2A' : baseColor;
   const hasMetrics = item.distancia_km != null || item.desnivel_m != null;
   const idInscripcion = item.id ?? item.inscripcion_id;
+  const imagenUrl = item.imagen_url?.trim();
+  const circuitoNombre = item.circuito_nombre?.trim();
+  const circuitoLogo = item.circuito_logo_url?.trim() || item.circuito_logo?.trim();
 
   async function handleDelete() {
     if (!idInscripcion || !onDelete) return;
@@ -91,119 +95,140 @@ export function SmartRaceCard({
   }
 
   const cardContent = (
-    <View style={[styles.cardContent, { borderLeftWidth: 4, borderLeftColor: accentColor }]}>
-      <View style={styles.cardTopRow}>
-        <View style={{ flex: 1 }}>
-          <Text
-            style={[
-              styles.raceName,
-              isFinalizada && styles.raceNameFinalizada,
-              !isFinalizada && { color: baseColor },
-            ]}
-            numberOfLines={2}
-          >
-            {item.nombre ?? 'Sin nombre'}
-          </Text>
-          {isGlobal && isEnrolled && (
-            <Text style={styles.inscritoBadge}>✅ Inscrito</Text>
-          )}
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <CountdownPill fechaInicio={item.fecha_inicio} estado={item.estado ?? 'Programada'} styles={styles} />
-          {isGlobal ? null : onDelete && !showConfirmDelete && (
-            <TouchableOpacity
-              onPress={() => setShowConfirmDelete(true)}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              style={{ padding: 4 }}
-            >
-              <Trash2 color="#555" size={18} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {!isGlobal && <StatusBadge estado={item.estado} styles={styles} />}
-
-      <View style={[styles.infoRow, { marginTop: 10 }]}>
-        <Calendar color="#555" size={13} />
-        <Text style={styles.infoText}>
-          <Text style={styles.infoTextHighlight}>
-            {formatDateRange(item.fecha_inicio, item.fecha_fin)}
-          </Text>
-        </Text>
-      </View>
-
-      {!!item.ciudad && (
-        <View style={styles.infoRow}>
-          <MapPin color="#555" size={13} />
-          <Text style={styles.infoText}>{item.ciudad}</Text>
-        </View>
+    <View style={[styles.card, isFinalizada && { opacity: 0.85 }]}>
+      {!!imagenUrl && (
+        <Image source={{ uri: imagenUrl }} style={styles.cardHeroImage} resizeMode="cover" />
       )}
-
-      {hasMetrics && (
-        <>
-          <View style={styles.divider} />
-          <View style={styles.metricsRow}>
-            {item.distancia_km != null && (
-              <View style={styles.metricItem}>
-                <TrendingUp color="#555" size={13} />
-                <Text style={styles.metricValue}>{item.distancia_km}</Text>
-                <Text style={styles.metricLabel}>km</Text>
-              </View>
+      <View style={[
+        styles.cardContent,
+        { borderLeftWidth: 4, borderLeftColor: accentColor },
+        imagenUrl && styles.cardContentWithHero,
+      ]}>
+        {(!!circuitoNombre || !!circuitoLogo) && (
+          <View style={styles.cardCircuitoRow}>
+            {!!circuitoLogo && (
+              <Image source={{ uri: circuitoLogo }} style={styles.cardCircuitoLogo} />
             )}
-            {item.desnivel_m != null && (
-              <View style={styles.metricItem}>
-                <Mountain color="#555" size={13} />
-                <Text style={styles.metricValue}>{item.desnivel_m}</Text>
-                <Text style={styles.metricLabel}>m D+</Text>
-              </View>
+            {!!circuitoNombre && (
+              <Text style={styles.cardCircuitoNombre} numberOfLines={1}>{circuitoNombre}</Text>
             )}
           </View>
-        </>
-      )}
+        )}
 
-      {!isGlobal && isFinalizada && item.resultado && (
-        <View style={styles.resultRow}>
-          <Text style={styles.resultLabel}>Resultado:</Text>
-          <Text style={styles.resultValue}>{item.resultado}</Text>
+        <View style={styles.cardTopRow}>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={[
+                styles.raceName,
+                isFinalizada && styles.raceNameFinalizada,
+                !isFinalizada && { color: baseColor },
+              ]}
+              numberOfLines={2}
+            >
+              {item.nombre ?? 'Sin nombre'}
+            </Text>
+            {isGlobal && isEnrolled && (
+              <Text style={styles.inscritoBadge}>✅ Inscrito</Text>
+            )}
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <CountdownPill fechaInicio={item.fecha_inicio} estado={item.estado ?? 'Programada'} styles={styles} />
+            {isGlobal ? null : onDelete && !showConfirmDelete && (
+              <TouchableOpacity
+                onPress={() => setShowConfirmDelete(true)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={{ padding: 4 }}
+              >
+                <Trash2 color="#555" size={18} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      )}
 
-      {!isGlobal && onDelete && showConfirmDelete && (
-        <View style={styles.unenrollConfirmWrap}>
-          <Text style={styles.unenrollConfirmText}>
-            {`¿Quitar "${item.nombre ?? 'esta carrera'}" de tu calendario?`}
+        {!isGlobal && <StatusBadge estado={item.estado} styles={styles} />}
+
+        <View style={[styles.infoRow, { marginTop: 8 }]}>
+          <Calendar color="#555" size={13} />
+          <Text style={styles.infoText}>
+            <Text style={styles.infoTextHighlight}>
+              {formatDateRange(item.fecha_inicio, item.fecha_fin)}
+            </Text>
           </Text>
-          <View style={styles.unenrollConfirmRow}>
-            <TouchableOpacity
-              style={styles.unenrollConfirmNo}
-              onPress={() => setShowConfirmDelete(false)}
-              disabled={deleteLoading}
-            >
-              <Text style={styles.unenrollConfirmNoText}>No, mantener</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.unenrollConfirmYes}
-              onPress={handleDelete}
-              disabled={deleteLoading}
-            >
-              {deleteLoading ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={styles.unenrollConfirmYesText}>Sí, eliminar</Text>
+        </View>
+
+        {!!item.ciudad && (
+          <View style={styles.infoRow}>
+            <MapPin color="#555" size={13} />
+            <Text style={styles.infoText}>{item.ciudad}</Text>
+          </View>
+        )}
+
+        {hasMetrics && (
+          <>
+            <View style={styles.divider} />
+            <View style={styles.metricsRow}>
+              {item.distancia_km != null && (
+                <View style={styles.metricItem}>
+                  <TrendingUp color="#555" size={13} />
+                  <Text style={styles.metricValue}>{item.distancia_km}</Text>
+                  <Text style={styles.metricLabel}>km</Text>
+                </View>
               )}
-            </TouchableOpacity>
+              {item.desnivel_m != null && (
+                <View style={styles.metricItem}>
+                  <Mountain color="#555" size={13} />
+                  <Text style={styles.metricValue}>{item.desnivel_m}</Text>
+                  <Text style={styles.metricLabel}>m D+</Text>
+                </View>
+              )}
+            </View>
+          </>
+        )}
+
+        {!isGlobal && isFinalizada && item.resultado && (
+          <View style={styles.resultRow}>
+            <Text style={styles.resultLabel}>Resultado:</Text>
+            <Text style={styles.resultValue}>{item.resultado}</Text>
           </View>
-        </View>
-      )}
+        )}
+
+        {!isGlobal && onDelete && showConfirmDelete && (
+          <View style={styles.unenrollConfirmWrap}>
+            <Text style={styles.unenrollConfirmText}>
+              {`¿Quitar "${item.nombre ?? 'esta carrera'}" de tu calendario?`}
+            </Text>
+            <View style={styles.unenrollConfirmRow}>
+              <TouchableOpacity
+                style={styles.unenrollConfirmNo}
+                onPress={() => setShowConfirmDelete(false)}
+                disabled={deleteLoading}
+              >
+                <Text style={styles.unenrollConfirmNoText}>No, mantener</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.unenrollConfirmYes}
+                onPress={handleDelete}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.unenrollConfirmYesText}>Sí, eliminar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </View>
     </View>
   );
 
-  const Wrapper = isGlobal && onPress ? TouchableOpacity : View;
-  const wrapperProps = isGlobal && onPress ? { onPress: () => onPress(item), activeOpacity: 0.8 } : {};
+  const isTappable = onPress && !isFinalizada && !showConfirmDelete;
+  const Wrapper = isTappable ? TouchableOpacity : View;
+  const wrapperProps = isTappable ? { onPress: () => onPress(item), activeOpacity: 0.8 } : {};
 
   return (
-    <Wrapper {...wrapperProps} style={[styles.card, isFinalizada && { opacity: 0.55 }]}>
+    <Wrapper {...wrapperProps} style={styles.cardWrapper}>
       {cardContent}
     </Wrapper>
   );

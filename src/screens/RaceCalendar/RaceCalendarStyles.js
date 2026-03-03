@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { theme } from '../../styles/theme';
 
 export const raceCalendarStyles = StyleSheet.create({
@@ -13,7 +13,7 @@ export const raceCalendarStyles = StyleSheet.create({
     paddingBottom: 48,
   },
 
-  // ── Header ─────────────────────────────────────────────────
+  // ── Header (alineado con Plan: headerRow, headerActionTrigger) ─
   header: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -35,6 +35,30 @@ export const raceCalendarStyles = StyleSheet.create({
     letterSpacing: -0.5,
     lineHeight: 28,
   },
+  headerActionTouchable: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerActionTrigger: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 210, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#00D2FF',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+      },
+      android: { elevation: 3 },
+      default: {},
+    }),
+  },
   addButton: {
     width: 44,
     height: 44,
@@ -47,39 +71,56 @@ export const raceCalendarStyles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // ── Segmented Control ──────────────────────────────────────
+  // ── Segmented Control (glassmorphism + Azul Neón — clon Plan) ─
   segmented: {
-    flexDirection: 'row',
-    backgroundColor: '#1A1A1A',
-    borderRadius: 14,
+    alignSelf: 'stretch',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 24,
     padding: 4,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
+    marginHorizontal: 0,
+    marginBottom: 24,
+    marginTop: 10,
+    overflow: 'hidden',
   },
-  segmentBtn: {
+  segmentedScrollView: {
     flex: 1,
-    paddingVertical: 10,
+  },
+  segmentedScrollContent: {
+    flexDirection: 'row',
+    flexGrow: 1,
+  },
+  segmentedBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 6,
-    borderRadius: 10,
   },
-  segmentBtnActive: {
-    backgroundColor: '#00F0FF',
-    shadowColor: '#00F0FF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
+  segmentedBtnActive: {
+    backgroundColor: 'rgba(0, 210, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 210, 255, 0.5)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#00D2FF',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+      default: {},
+    }),
   },
-  segmentText: {
-    color: '#555',
+  segmentedText: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#8E8E93',
+    letterSpacing: 0.5,
   },
-  segmentTextActive: {
-    color: '#121212',
+  segmentedTextActive: {
+    color: '#00D2FF',
     fontWeight: '800',
   },
 
@@ -268,17 +309,16 @@ export const raceCalendarStyles = StyleSheet.create({
   resultLabel: { color: '#444', fontSize: 12 },
   resultValue: { color: '#888', fontSize: 12, fontWeight: '600' },
 
-  // ── Loading ───────────────────────────────────────────────
+  // ── Loading (alineado Plan) ────────────────────────────────
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 12,
   },
   loadingText: {
-    color: '#444',
-    fontSize: 13,
-    fontWeight: '500',
+    color: '#555',
+    fontSize: 14,
   },
 
   // ── Error ─────────────────────────────────────────────────
@@ -296,47 +336,35 @@ export const raceCalendarStyles = StyleSheet.create({
     lineHeight: 22,
   },
 
-  // ── Empty state ───────────────────────────────────────────
+  // ── Empty state (alineado Plan: emptyPlanContainer) ─────────
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 36,
-    paddingBottom: 60,
-    gap: 12,
+    paddingVertical: 60,
+    paddingHorizontal: 40,
   },
   emptyIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(0,240,255,0.07)',
-    borderWidth: 1,
-    borderColor: 'rgba(0,240,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-    shadowColor: '#00F0FF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
+    marginBottom: 0,
   },
   emptyTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '800',
+    color: '#00F0FF',
+    fontSize: 17,
+    fontWeight: '700',
     textAlign: 'center',
-    letterSpacing: -0.3,
+    marginBottom: 8,
   },
   emptyText: {
-    color: '#444',
+    color: '#555',
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 22,
   },
   emptyButton: {
-    marginTop: 8,
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: 'hidden',
+    minWidth: 280,
+    marginTop: 24,
   },
   emptyButtonGradient: {
     paddingVertical: 14,
@@ -344,36 +372,36 @@ export const raceCalendarStyles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyButtonText: {
-    color: '#0D0D0D',
-    fontSize: 15,
+    color: '#000000',
     fontWeight: '800',
-    letterSpacing: 0.3,
+    fontSize: 16,
   },
 
-  // ── Bottom Sheet ──────────────────────────────────────────
+  // ── Bottom Sheet (unificado: overlay, container, handle) ─────
   sheetOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0,0,0,0.75)',
     justifyContent: 'flex-end',
   },
   sheetContainer: {
-    backgroundColor: '#131313',
+    backgroundColor: '#1A1A1A',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 44,
+    paddingBottom: 0,
     borderTopWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: '#2A2A2A',
     maxHeight: '92%',
+    height: '92%',
   },
   sheetHandle: {
     width: 40,
     height: 4,
-    backgroundColor: '#2A2A2A',
+    backgroundColor: '#333',
     borderRadius: 2,
     alignSelf: 'center',
-    marginBottom: 22,
+    marginBottom: 20,
   },
   sheetTitleRow: {
     flexDirection: 'row',
@@ -393,24 +421,111 @@ export const raceCalendarStyles = StyleSheet.create({
     marginBottom: 16,
   },
 
-  // ── Formulario ────────────────────────────────────────────
+  // ── Nueva Carrera (igual que Añadir Entrenamiento en Plan) ──
+  manualModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'flex-end',
+  },
+  manualModalSheet: {
+    backgroundColor: '#1A1A1A',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 40,
+    borderTopWidth: 1,
+    borderColor: '#2A2A2A',
+    maxHeight: '90%',
+  },
+  manualModalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#333',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  manualModalTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 20,
+    letterSpacing: -0.3,
+  },
+  manualLabel: {
+    color: '#555',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  manualRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  manualRowItem: {
+    flex: 1,
+  },
+  prioridadPills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  prioridadPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    backgroundColor: '#121212',
+    flex: 1,
+  },
+  prioridadPillActive: {
+    borderColor: '#00F0FF',
+    backgroundColor: '#00F0FF15',
+  },
+  prioridadPillText: {
+    color: '#555',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  prioridadPillTextActive: {
+    color: '#00F0FF',
+    fontWeight: '800',
+  },
+  manualActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  manualSaveBtn: {
+    flex: 1,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+
+  // ── Formulario (alineado Plan: manualLabel, manualInput) ────
   formLabel: {
     color: '#555',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.5,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
     textTransform: 'uppercase',
-    marginBottom: 7,
+    marginBottom: 8,
     marginTop: 16,
   },
   formInput: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: '#121212',
     color: '#fff',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderColor: '#2A2A2A',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 15,
   },
   formInputError: {
@@ -433,54 +548,56 @@ export const raceCalendarStyles = StyleSheet.create({
     marginTop: 0,
   },
 
-  // ── Botones del sheet ─────────────────────────────────────
+  // ── Botones del sheet (alineado Plan: manualActions) ────────
   modalActions: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     marginTop: 24,
+    marginBottom: 8,
   },
   modalCancelBtn: {
     flex: 1,
-    paddingVertical: 15,
+    paddingVertical: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: '#333',
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalCancelText: {
-    color: '#555',
+    color: '#888',
     fontSize: 14,
     fontWeight: '700',
   },
   modalSaveGradient: {
-    flex: 1.6,
+    flex: 1.5,
     borderRadius: 14,
     overflow: 'hidden',
   },
   modalSaveBtn: {
-    paddingVertical: 15,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 50,
+    flexDirection: 'row',
+    gap: 6,
   },
   modalSaveText: {
-    color: '#0D0D0D',
+    color: '#121212',
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
   },
 
-  // ── Global Race Detail Sheet ───────────────────────────────
+  // ── Global Race Detail Sheet (alineado con sheetContainer) ──
   detailSheet: {
-    backgroundColor: '#131313',
+    backgroundColor: '#1A1A1A',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 44,
+    paddingBottom: theme.SHEET_PADDING_BOTTOM,
     borderTopWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    maxHeight: '85%',
+    borderColor: '#2A2A2A',
+    maxHeight: '92%',
   },
   detailHandle: {
     width: 40,
@@ -736,19 +853,19 @@ export const raceCalendarStyles = StyleSheet.create({
   },
   filterSelectWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   filterChip: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: '#2A2A2A',
+    backgroundColor: '#121212',
   },
   filterChipActive: {
-    backgroundColor: 'rgba(0,240,255,0.15)',
-    borderColor: 'rgba(0,240,255,0.4)',
+    borderColor: '#00F0FF',
+    backgroundColor: '#00F0FF15',
   },
-  filterChipText: { color: '#777', fontSize: 12, fontWeight: '700' },
-  filterChipTextActive: { color: '#00F0FF' },
+  filterChipText: { color: '#555', fontSize: 13, fontWeight: '600' },
+  filterChipTextActive: { color: '#00F0FF', fontWeight: '800' },
   difficultyRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -780,14 +897,15 @@ export const raceCalendarStyles = StyleSheet.create({
 
   // ── Filter Bottom Sheet ─────────────────────────────────────
   filterSheet: {
-    backgroundColor: '#131313',
+    backgroundColor: '#1A1A1A',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 32,
+    paddingBottom: theme.SHEET_PADDING_BOTTOM,
     borderTopWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: '#2A2A2A',
+    maxHeight: '92%',
   },
   filterSheetHeader: {
     flexDirection: 'row',
@@ -815,8 +933,247 @@ export const raceCalendarStyles = StyleSheet.create({
     fontWeight: '900',
   },
 
-  // ── Race Detail Sheet (Marketplace) ─────────────────────────
-  detailScroll: { paddingBottom: 40 },
+  // ── Race Detail Sheet (Marketplace) — ficha técnica completa ─
+  detailScroll: { paddingBottom: 24, paddingHorizontal: 0 },
+  // Hero image (first in scroll, full width)
+  detailHeroImageWrap: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#2A2A2A',
+    marginHorizontal: -24,
+    marginBottom: 16,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  detailRaceImage: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#2A2A2A',
+  },
+  detailCircuitoLogoOverlay: {
+    position: 'absolute',
+    bottom: 12,
+    left: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    overflow: 'hidden',
+  },
+  detailCircuitoLogoImg: {
+    width: 48,
+    height: 48,
+  },
+  detailCircuitoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  detailCircuitoLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+  },
+  // Title + Quick Stats
+  detailHeroTitle: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '800',
+    marginTop: 20,
+    marginBottom: 4,
+    letterSpacing: -0.4,
+    lineHeight: 26,
+  },
+  detailHeroSubtitle: {
+    color: '#666',
+    fontSize: 13,
+    marginBottom: 16,
+  },
+  detailQuickStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 16,
+  },
+  detailQuickStatPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  detailQuickStatPillText: {
+    color: '#bbb',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  detailQuickStatPillTextLink: {
+    color: '#00F0FF',
+  },
+  // XERPA Readiness card
+  xerpaReadinessCard: {
+    backgroundColor: 'rgba(0, 210, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 210, 255, 0.3)',
+    borderRadius: 16,
+    padding: 16,
+    marginVertical: 20,
+  },
+  // Sticky footer
+  detailStickyFooter: {
+    padding: 20,
+    paddingBottom: Math.max(20, theme.SHEET_PADDING_BOTTOM),
+    borderTopWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: '#1E1E1E',
+  },
+  readinessSection: {
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  readinessSectionTitle: {
+    color: '#00F0FF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 10,
+  },
+  readinessProgressWrap: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  readinessProgressTrack: {
+    height: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  readinessProgressFill: {
+    height: '100%',
+    backgroundColor: '#00F0FF',
+  },
+  readinessStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  readinessTextBlock: { flex: 1 },
+  readinessPctText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  readinessMessageText: {
+    color: '#8E8E93',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  readinessPctBadge: {
+    color: '#00F0FF',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  quickStatsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  quickStatCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 14,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  quickStatValue: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  quickStatLabel: {
+    color: '#555',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  dificultadQuickBadge: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignSelf: 'center',
+  },
+  dificultadQuickText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  detailSection: {
+    marginBottom: 20,
+  },
+  detailSectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  detailSectionTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  detailDescripcionText: {
+    color: '#aaa',
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  detailSectionBody: {
+    color: '#aaa',
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  mapPlaceholder: {
+    marginTop: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 0,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  mapPlaceholderText: {
+    color: '#555',
+    fontSize: 14,
+    marginTop: 8,
+  },
+  mapPlaceholderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  mapPlaceholderBtnText: {
+    color: '#00F0FF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  detailUrlLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingVertical: 12,
+  },
+  detailUrlLinkText: {
+    color: '#00F0FF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
   detailBadgesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

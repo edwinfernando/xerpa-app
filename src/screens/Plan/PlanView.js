@@ -1,20 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
+  Animated,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Modal,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
+  LayoutAnimation,
 } from 'react-native';
+import Modal from 'react-native-modal';
 import { ScreenWrapper } from '../../components/ScreenWrapper';
+import { CollapsibleHeader } from '../../components/CollapsibleHeader';
+import { useCollapsibleHeader } from '../../hooks/useCollapsibleHeader';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import { useWorkoutContext } from '../../context/WorkoutContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { Plus, Sparkles, History } from 'lucide-react-native';
+import { AnimatedActionButton } from '../../components/ui/AnimatedActionButton';
+import { useNavigationBarColor } from '../../hooks/useNavigationBarColor';
 import { getWeekBounds, generateWeekDays, groupByMonth } from './usePlan';
 
 // ─────────────────────────────────────────────────────────────
@@ -33,6 +42,12 @@ const TIPO_OPTIONS = ['Ride', 'Run', 'Strength', 'Rest', 'Walk', 'Other'];
 function formatDateLabel(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   return `${DAY_NAMES[d.getDay()]} ${d.getDate()} ${MONTH_ABBR[d.getMonth()]}`;
+}
+
+function formatMonthYear(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const formatted = d.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
 function formatDuracion(min) {
@@ -87,35 +102,94 @@ const RPE_LABELS = {
 // ─────────────────────────────────────────────────────────────
 // WorkoutDetailSheet — Bottom Sheet interactivo
 // ─────────────────────────────────────────────────────────────
-function WorkoutDetailSheet({ visible, workout, dateStr, onClose, onComplete, styles }) {
+const SWIPE_HEADER_HEIGHT = 120;
+
+function WorkoutDetailSheet({ visible, workout, dateStr, onClose, onSaveFeedback, styles }) {
   const [completing, setCompleting] = useState(false);
+  const [notaAtleta, setNotaAtleta] = useState('');
+  const [scrollOffsetY, setScrollOffsetY] = useState(0);
+  const scrollViewRef = useRef(null);
+  const scrollOffsetRef = useRef(0);
+
+  useEffect(() => {
+    if (visible) {
+      setScrollOffsetY(0);
+      scrollOffsetRef.current = 0;
+    }
+  }, [visible]);
+
+  const propagateSwipe = useCallback((evt) => {
+    const locationY = evt?.nativeEvent?.locationY ?? 0;
+    return locationY > SWIPE_HEADER_HEIGHT;
+  }, []);
+
+  const scrollTo = useCallback((offset) => {
+    if (offset && typeof offset.y === 'number') {
+      const currentY = scrollOffsetRef.current;
+      const newY = Math.max(0, currentY + offset.y);
+      scrollViewRef.current?.scrollTo({ y: newY, animated: false });
+    }
+  }, []);
 
   if (!workout) return null;
 
   const { icon, color } = getTypeConfig(workout.tipo);
   const duracion = formatDuracion(workout.duracion_min);
 
-  async function handleComplete() {
+  const origenBadge = workout.is_generado_ia
+    ? { label: 'Generado por XERPA COACH (IA)', icon: 'sparkles' }
+    : workout.entrenador_id
+      ? { label: 'Asignado por Entrenador', icon: 'person' }
+      : null;
+
+  async function handleGuardarFeedback() {
     setCompleting(true);
     try {
-      await onComplete(workout.id);
+      await onSaveFeedback(workout.id, notaAtleta);
       onClose();
     } catch (e) {
-      Alert.alert('Error de XERPA', e?.message ?? 'No se pudo marcar el entrenamiento como completado.');
+      Alert.alert('Error de XERPA', e?.message ?? 'No se pudo guardar el feedback.');
     } finally {
       setCompleting(false);
     }
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      isVisible={visible}
+      onBackdropPress={onClose}
+      onBackButtonPress={onClose}
+      onSwipeComplete={onClose}
+      swipeDirection={scrollOffsetY <= 0 ? ['down'] : undefined}
+      propagateSwipe={propagateSwipe}
+      scrollTo={scrollTo}
+      scrollOffset={scrollOffsetY}
+      scrollOffsetMax={0}
+      animationIn="slideInUp"
+      animationOut="slideOutDown"
+      style={{ margin: 0, justifyContent: 'flex-end' }}
+    >
       <View style={styles.detailModalContainer}>
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
 
       <View style={styles.detailSheet}>
         <View style={styles.detailHandle} />
 
-        <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+        <ScrollView
+          ref={scrollViewRef}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+          decelerationRate="fast"
+          keyboardShouldPersistTaps="handled"
+          overScrollMode="never"
+          onScroll={(e) => {
+            const currentOffset = e.nativeEvent.contentOffset.y;
+            const y = currentOffset < 0 ? 0 : currentOffset;
+            setScrollOffsetY(y);
+            scrollOffsetRef.current = y;
+          }}
+          scrollEventThrottle={16}
+        >
           {/* Icono grande + pill tipo */}
           <View style={styles.detailIconRow}>
             <View style={[
@@ -195,35 +269,53 @@ function WorkoutDetailSheet({ visible, workout, dateStr, onClose, onComplete, st
             </>
           )}
 
+          {/* Feedback: nota_atleta (si completado, mostrar nota existente; si no, formulario) */}
+          {workout.completado && !!workout.nota_atleta && (
+            <>
+              <View style={styles.detailDivider} />
+              <Text style={styles.detailSectionLabel}>Tus sensaciones</Text>
+              <Text style={styles.detailText}>{workout.nota_atleta}</Text>
+            </>
+          )}
+
+          {/* Formulario feedback (solo si no completado) */}
+          {!workout.completado && (
+            <>
+              <View style={styles.detailDivider} />
+              <Text style={styles.detailSectionLabel}>¿Cómo te sentiste? (opcional)</Text>
+              <Input
+                value={notaAtleta}
+                onChangeText={setNotaAtleta}
+                placeholder="Escribe tus sensaciones del entreno..."
+                multiline
+                numberOfLines={3}
+                style={styles.detailFeedbackInput}
+              />
+            </>
+          )}
+
           {/* Acciones */}
           <View style={styles.detailActions}>
-            <TouchableOpacity style={styles.detailCloseBtn} onPress={onClose}>
-              <Text style={styles.detailCloseBtnText}>Cerrar</Text>
-            </TouchableOpacity>
-
+            <Button
+              title="Cerrar"
+              variant="secondary"
+              onPress={onClose}
+              style={styles.detailCloseBtn}
+            />
             {workout.completado ? (
               <View style={styles.detailAlreadyDone}>
                 <Ionicons name="checkmark-circle" size={15} color="#39FF1477" />
                 <Text style={styles.detailAlreadyDoneText}>Ya completado</Text>
               </View>
             ) : (
-              <LinearGradient
-                colors={['#39FF14', '#00F0FF']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
+              <Button
+                title="Guardar Feedback"
+                variant="solid"
+                onPress={handleGuardarFeedback}
+                loading={completing}
+                disabled={completing}
                 style={styles.detailCompleteGradient}
-              >
-                <TouchableOpacity
-                  style={styles.detailCompleteBtn}
-                  onPress={handleComplete}
-                  disabled={completing}
-                >
-                  {completing
-                    ? <ActivityIndicator size="small" color="#0F1116" />
-                    : <Text style={styles.detailCompleteBtnText}>✅ Marcar Completado</Text>
-                  }
-                </TouchableOpacity>
-              </LinearGradient>
+              />
             )}
           </View>
         </ScrollView>
@@ -240,7 +332,7 @@ function PastCard({ dateStr, workout, onPress, styles }) {
   const { icon, color } = getTypeConfig(workout?.tipo);
 
   const inner = (
-    <View style={[styles.card, styles.cardPast]}>
+    <View style={styles.pastCardContainer}>
       <View style={styles.cardHeader}>
         <View style={[styles.cardIconBox, { borderWidth: 1, borderColor: color + '44' }]}>
           <MaterialCommunityIcons name={icon} size={20} color={color + '88'} />
@@ -269,6 +361,18 @@ function PastCard({ dateStr, workout, onPress, styles }) {
               <Text style={styles.statValue}>{workout.tss_plan}</Text>
             </View>
           )}
+          {workout.hora && (
+            <View style={styles.statItem}>
+              <Ionicons name="alarm-outline" size={13} color="#555" />
+              <Text style={styles.statValue}>{workout.hora}</Text>
+            </View>
+          )}
+          {workout.punto_encuentro && (
+            <View style={styles.statItem}>
+              <Ionicons name="location-outline" size={13} color="#555" />
+              <Text style={styles.statValue} numberOfLines={1}>{workout.punto_encuentro}</Text>
+            </View>
+          )}
         </View>
       )}
     </View>
@@ -286,22 +390,37 @@ function PastCard({ dateStr, workout, onPress, styles }) {
 // WorkoutCard — Today (Focus Card) — ahora tappable
 // ─────────────────────────────────────────────────────────────
 function TodayCard({ dateStr, workout, onPress, onStop, styles }) {
+  const navigation = useNavigation();
   const { icon, color } = getTypeConfig(workout?.tipo);
   const { isTimerActive, startTimer } = useWorkoutContext();
 
-  // Mostrar botón solo si hay entreno y no está completado
   const showTimerBtn = workout && !workout.completado;
+  const isRestDay = !workout;
+  const showActionButton = !workout?.completado; // Mostrar CTA si no está completado
+
+  function handleActionPress() {
+    if (isRestDay) {
+      onPress?.();
+      return;
+    }
+    if (isTimerActive) {
+      onStop?.();
+      return;
+    }
+    startTimer();
+    navigation.navigate('WorkoutActive', { plan: workout });
+  }
 
   return (
     <TouchableOpacity
-      style={[styles.card, styles.cardToday]}
-      onPress={workout ? onPress : undefined}
-      activeOpacity={workout ? 0.82 : 1}
+      style={[styles.todayCardContainer]}
+      onPress={workout && !showActionButton ? onPress : undefined}
+      activeOpacity={workout && !showActionButton ? 0.82 : 1}
     >
-      {/* Pill "HOY" */}
+      {/* Badge "HOY" con punto verde neón (en vivo) */}
       <View style={styles.todayPill}>
         <View style={styles.todayPillDot} />
-        <Text style={styles.todayPillText}>Hoy · {formatDateLabel(dateStr)}</Text>
+        <Text style={styles.todayPillText}>HOY</Text>
       </View>
 
       <View style={styles.cardHeader}>
@@ -310,13 +429,13 @@ function TodayCard({ dateStr, workout, onPress, onStop, styles }) {
         </View>
         <View style={styles.cardMeta}>
           <Text style={[styles.cardDayLabel, styles.cardDayLabelToday]}>
-            {workout?.tipo ?? 'Entrenamiento'}
+            {workout?.tipo ?? 'Descanso'}
           </Text>
-          <Text style={styles.cardTitle}>
+          <Text style={styles.cardTitleToday}>
             {workout?.titulo ?? 'Sin entrenamiento planificado'}
           </Text>
         </View>
-        {workout && !showTimerBtn && (
+        {workout && !showTimerBtn && !showActionButton && (
           <Ionicons name="chevron-forward" size={18} color="#39FF1455" />
         )}
       </View>
@@ -335,6 +454,18 @@ function TodayCard({ dateStr, workout, onPress, onStop, styles }) {
               <Text style={styles.statValue}>{workout.tss_plan}</Text>
             </View>
           )}
+          {workout.hora && (
+            <View style={styles.statItem}>
+              <Ionicons name="alarm-outline" size={13} color="#555" />
+              <Text style={styles.statValue}>{workout.hora}</Text>
+            </View>
+          )}
+          {workout.punto_encuentro && (
+            <View style={styles.statItem}>
+              <Ionicons name="location-outline" size={13} color="#555" />
+              <Text style={styles.statValue} numberOfLines={1}>{workout.punto_encuentro}</Text>
+            </View>
+          )}
           {workout.completado && (
             <View style={[styles.statItem, { marginLeft: 'auto' }]}>
               <Ionicons name="checkmark-circle" size={14} color="#39FF14" />
@@ -344,11 +475,11 @@ function TodayCard({ dateStr, workout, onPress, onStop, styles }) {
         </View>
       )}
 
-      {/* ── Botón Play/Stop en esquina superior derecha ─────── */}
-      {showTimerBtn && (
+      {/* Botón Play/Stop en esquina superior derecha (alternativa al CTA) */}
+      {showTimerBtn && !showActionButton && (
         <TouchableOpacity
           style={styles.cardTimerBtn}
-          onPress={isTimerActive ? onStop : startTimer}
+          onPress={handleActionPress}
           activeOpacity={0.75}
           hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
         >
@@ -357,6 +488,19 @@ function TodayCard({ dateStr, workout, onPress, onStop, styles }) {
             size={34}
             color={isTimerActive ? '#ff5252' : '#39FF14'}
           />
+        </TouchableOpacity>
+      )}
+
+      {/* CTA masivo: INICIAR ENTRENAMIENTO / VER DETALLES */}
+      {showActionButton && (
+        <TouchableOpacity
+          style={styles.todayActionButton}
+          onPress={handleActionPress}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.todayActionText}>
+            {isRestDay ? 'VER DETALLES' : 'INICIAR ENTRENAMIENTO'}
+          </Text>
         </TouchableOpacity>
       )}
     </TouchableOpacity>
@@ -409,6 +553,18 @@ function FutureCard({ dateStr, workout, onPress, styles }) {
             <Text style={styles.statValue}>{workout.tss_plan}</Text>
           </View>
         )}
+          {workout.hora && (
+            <View style={styles.statItem}>
+              <Ionicons name="alarm-outline" size={13} color="#555" />
+              <Text style={styles.statValue}>{workout.hora}</Text>
+            </View>
+          )}
+        {workout.punto_encuentro && (
+          <View style={styles.statItem}>
+            <Ionicons name="location-outline" size={13} color="#555" />
+            <Text style={styles.statValue} numberOfLines={1}>{workout.punto_encuentro}</Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -424,9 +580,35 @@ function AddManualModal({ visible, onClose, onSave, styles }) {
   const [tipo, setTipo] = useState('Ride');
   const [duracion, setDuracion] = useState('');
   const [tss, setTss] = useState('');
+  const [hora, setHora] = useState('');
+  const [punto_encuentro, setPuntoEncuentro] = useState('');
   const [detalle, setDetalle] = useState('');
   const [tituloError, setTituloError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [scrollOffsetY, setScrollOffsetY] = useState(0);
+  const scrollViewRef = useRef(null);
+  const scrollOffsetRef = useRef(0);
+
+  useEffect(() => {
+    if (visible) {
+      setScrollOffsetY(0);
+      scrollOffsetRef.current = 0;
+    }
+  }, [visible]);
+
+  const SWIPE_HEADER_HEIGHT = 95;
+  const propagateSwipe = useCallback((evt) => {
+    const locationY = evt?.nativeEvent?.locationY ?? 0;
+    return locationY > SWIPE_HEADER_HEIGHT;
+  }, []);
+
+  const scrollTo = useCallback((offset) => {
+    if (offset && typeof offset.y === 'number') {
+      const currentY = scrollOffsetRef.current;
+      const newY = Math.max(0, currentY + offset.y);
+      scrollViewRef.current?.scrollTo({ y: newY, animated: false });
+    }
+  }, []);
 
   const resetForm = () => {
     setTitulo('');
@@ -434,6 +616,8 @@ function AddManualModal({ visible, onClose, onSave, styles }) {
     setTipo('Ride');
     setDuracion('');
     setTss('');
+    setHora('');
+    setPuntoEncuentro('');
     setDetalle('');
     setTituloError('');
   };
@@ -444,7 +628,7 @@ function AddManualModal({ visible, onClose, onSave, styles }) {
     if (!titulo.trim()) { setTituloError('El título es obligatorio.'); return; }
     setSaving(true);
     try {
-      await onSave({ titulo: titulo.trim(), fecha, tipo, duracion_min: duracion, tss_plan: tss, detalle });
+      await onSave({ titulo: titulo.trim(), fecha, tipo, duracion_min: duracion, tss_plan: tss, hora: hora.trim(), punto_encuentro: punto_encuentro.trim(), detalle });
       resetForm();
       onClose();
       Alert.alert('¡Listo! 💪', 'Entrenamiento añadido al plan.');
@@ -456,7 +640,20 @@ function AddManualModal({ visible, onClose, onSave, styles }) {
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
+    <Modal
+      isVisible={visible}
+      onBackdropPress={handleClose}
+      onBackButtonPress={handleClose}
+      onSwipeComplete={handleClose}
+      swipeDirection={scrollOffsetY <= 0 ? ['down'] : undefined}
+      propagateSwipe={propagateSwipe}
+      scrollTo={scrollTo}
+      scrollOffset={scrollOffsetY}
+      scrollOffsetMax={0}
+      animationIn="slideInUp"
+      animationOut="slideOutDown"
+      style={{ margin: 0, justifyContent: 'flex-end' }}
+    >
       <KeyboardAvoidingView
         style={styles.manualModalOverlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -466,16 +663,30 @@ function AddManualModal({ visible, onClose, onSave, styles }) {
           <View style={styles.manualModalHandle} />
           <Text style={styles.manualModalTitle}>Añadir Entrenamiento</Text>
 
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            ref={scrollViewRef}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            decelerationRate="fast"
+            keyboardShouldPersistTaps="handled"
+            overScrollMode="never"
+            onScroll={(e) => {
+              const currentOffset = e.nativeEvent.contentOffset.y;
+              const y = currentOffset < 0 ? 0 : currentOffset;
+              setScrollOffsetY(y);
+              scrollOffsetRef.current = y;
+            }}
+            scrollEventThrottle={16}
+          >
             <Text style={styles.manualLabel}>Título *</Text>
-            <TextInput
-              style={[styles.manualInput, !!tituloError && styles.manualInputError]}
-              placeholder="Ej. Rodada zona 2 + fartlek"
-              placeholderTextColor="#444"
+            <Input
               value={titulo}
-              onChangeText={t => { setTitulo(t); if (tituloError) setTituloError(''); }}
+              onChangeText={(t) => { setTitulo(t); if (tituloError) setTituloError(''); }}
+              placeholder="Ej. Rodada zona 2 + fartlek"
+              error={!!tituloError}
+              errorText={tituloError}
+              style={{ marginBottom: 16 }}
             />
-            {!!tituloError && <Text style={styles.manualErrorText}>{tituloError}</Text>}
 
             <Text style={styles.manualLabel}>Tipo</Text>
             <View style={styles.tipoPills}>
@@ -491,68 +702,78 @@ function AddManualModal({ visible, onClose, onSave, styles }) {
             </View>
 
             <Text style={styles.manualLabel}>Fecha</Text>
-            <TextInput
-              style={styles.manualInput}
-              placeholder="AAAA-MM-DD"
-              placeholderTextColor="#444"
+            <Input
               value={fecha}
               onChangeText={setFecha}
+              placeholder="AAAA-MM-DD"
               keyboardType="numbers-and-punctuation"
+              style={{ marginBottom: 16 }}
             />
 
             <View style={styles.manualRow}>
               <View style={styles.manualRowItem}>
+                <Text style={styles.manualLabel}>Hora</Text>
+                <Input
+                  value={hora}
+                  onChangeText={setHora}
+                  placeholder="08:00"
+                  keyboardType="numbers-and-punctuation"
+                  style={{ marginBottom: 16 }}
+                />
+              </View>
+              <View style={styles.manualRowItem}>
+                <Text style={styles.manualLabel}>Punto de encuentro</Text>
+                <Input
+                  value={punto_encuentro}
+                  onChangeText={setPuntoEncuentro}
+                  placeholder="Ej. Parque Central"
+                  style={{ marginBottom: 16 }}
+                />
+              </View>
+            </View>
+
+            <View style={styles.manualRow}>
+              <View style={styles.manualRowItem}>
                 <Text style={styles.manualLabel}>Duración (min)</Text>
-                <TextInput
-                  style={styles.manualInput}
-                  placeholder="90"
-                  placeholderTextColor="#444"
+                <Input
                   value={duracion}
                   onChangeText={setDuracion}
+                  placeholder="90"
                   keyboardType="numeric"
+                  style={{ marginBottom: 16 }}
                 />
               </View>
               <View style={styles.manualRowItem}>
                 <Text style={styles.manualLabel}>TSS</Text>
-                <TextInput
-                  style={styles.manualInput}
-                  placeholder="80"
-                  placeholderTextColor="#444"
+                <Input
                   value={tss}
                   onChangeText={setTss}
+                  placeholder="80"
                   keyboardType="numeric"
+                  style={{ marginBottom: 16 }}
                 />
               </View>
             </View>
 
             <Text style={styles.manualLabel}>Notas / Detalle</Text>
-            <TextInput
-              style={[styles.manualInput, styles.manualTextarea]}
-              placeholder="Descripción del entrenamiento..."
-              placeholderTextColor="#444"
+            <Input
               value={detalle}
               onChangeText={setDetalle}
+              placeholder="Descripción del entrenamiento..."
               multiline
               numberOfLines={3}
+              style={{ marginBottom: 16 }}
             />
 
             <View style={styles.manualActions}>
-              <TouchableOpacity style={styles.manualCancelBtn} onPress={handleClose}>
-                <Text style={styles.manualCancelText}>Cancelar</Text>
-              </TouchableOpacity>
-              <LinearGradient
-                colors={['#00F0FF', '#39FF14']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.manualSaveBtn}
-              >
-                <TouchableOpacity style={styles.manualSaveGradient} onPress={handleSave} disabled={saving}>
-                  {saving
-                    ? <ActivityIndicator size="small" color="#121212" />
-                    : <Text style={styles.manualSaveText}>💾 Guardar Entreno</Text>
-                  }
-                </TouchableOpacity>
-              </LinearGradient>
+              <Button
+                title="Guardar Entreno"
+                variant="solid"
+                onPress={handleSave}
+                loading={saving}
+                disabled={saving}
+                style={[styles.manualSaveBtn, { flex: 1 }]}
+              />
             </View>
           </ScrollView>
         </View>
@@ -566,7 +787,7 @@ function AddManualModal({ visible, onClose, onSave, styles }) {
 // ─────────────────────────────────────────────────────────────
 function GeneratingOverlay({ visible, styles }) {
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal isVisible={visible} animationIn="fadeIn" animationOut="fadeOut">
       <View style={styles.generatingOverlay}>
         <View style={styles.generatingCard}>
           <ActivityIndicator size="large" color="#00F0FF" style={{ marginBottom: 20 }} />
@@ -606,7 +827,17 @@ function TimerFinishSheet({ visible, totalSecs, onClose, onSave, styles }) {
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      isVisible={visible}
+      onBackdropPress={onClose}
+      onBackButtonPress={onClose}
+      onSwipeComplete={onClose}
+      swipeDirection={['down']}
+      propagateSwipe={true}
+      animationIn="slideInUp"
+      animationOut="slideOutDown"
+      style={{ margin: 0, justifyContent: 'flex-end' }}
+    >
       <View style={styles.finishModalContainer}>
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
 
@@ -650,27 +881,20 @@ function TimerFinishSheet({ visible, totalSecs, onClose, onSave, styles }) {
 
         {/* Botones */}
         <View style={styles.finishActions}>
-          <TouchableOpacity style={styles.finishDiscardBtn} onPress={onClose}>
-            <Text style={styles.finishDiscardText}>Descartar</Text>
-          </TouchableOpacity>
-
-          <LinearGradient
-            colors={['#39FF14', '#00F0FF']}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
+          <Button
+            title="Descartar"
+            variant="secondary"
+            onPress={onClose}
+            style={styles.finishDiscardBtn}
+          />
+          <Button
+            title="Guardar en Diario"
+            variant="solid"
+            onPress={handleSave}
+            loading={saving}
+            disabled={saving}
             style={styles.finishSaveGradient}
-          >
-            <TouchableOpacity
-              style={styles.finishSaveBtn}
-              onPress={handleSave}
-              disabled={saving}
-            >
-              {saving
-                ? <ActivityIndicator size="small" color="#0F1116" />
-                : <Text style={styles.finishSaveText}>💾 Guardar en Diario</Text>
-              }
-            </TouchableOpacity>
-          </LinearGradient>
+          />
         </View>
       </View>
       </View>
@@ -679,39 +903,67 @@ function TimerFinishSheet({ visible, totalSecs, onClose, onSave, styles }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// EmptyPlanState — Oportunidad de generación con IA
+// ─────────────────────────────────────────────────────────────
+function EmptyPlanState({ onGeneratePlan, isGenerating, styles }) {
+  return (
+    <View style={styles.emptyPlanContainer}>
+      <View style={styles.emptyPlanIconWrap}>
+        <Sparkles color="#00D2FF" size={56} strokeWidth={1.5} />
+      </View>
+      <Text style={styles.emptyPlanTitle}>Semana en Blanco</Text>
+      <Text style={styles.emptyPlanText}>
+        Tu lienzo está listo. Deja que XERPA AI diseñe tu próximo microciclo basado en tu fatiga actual.
+      </Text>
+      <TouchableOpacity
+        style={styles.emptyPlanButton}
+        onPress={onGeneratePlan}
+        disabled={isGenerating}
+        activeOpacity={0.85}
+      >
+        {isGenerating ? (
+          <ActivityIndicator size="small" color="#000000" />
+        ) : (
+          <Text style={styles.emptyPlanButtonText}>Generar Plan con XERPA AI</Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // Pestaña Semana Actual
 // ─────────────────────────────────────────────────────────────
-function WeekTab({ weekWorkouts, onGeneratePlan, isGenerating, onAddManual, onOpenDetail, onStopTimer, styles }) {
+function WeekTab({ weekWorkouts, onGeneratePlan, isGenerating, onOpenDetail, onStopTimer, onTodayCardLayout, styles }) {
   const { monday, today } = getWeekBounds();
   const weekDays = generateWeekDays(monday);
+
+  // Renderizado condicional estricto: o EmptyPlanState o los 7 días, nunca ambos
+  if (weekWorkouts.length === 0) {
+    return (
+      <EmptyPlanState
+        onGeneratePlan={onGeneratePlan}
+        isGenerating={isGenerating}
+        styles={styles}
+      />
+    );
+  }
 
   const workoutMap = {};
   weekWorkouts.forEach(w => { workoutMap[w.fecha] = w; });
 
-  const empty = weekWorkouts.length === 0;
-
   return (
     <>
-      {/* Action Bar */}
+      {/* Action Bar (solo Generar Plan; Añadir está en el header) */}
       <View style={styles.actionBar}>
-        <LinearGradient
-          colors={['#00F0FF', '#39FF14']}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
+        <Button
+          title="Generar Plan"
+          variant="primary"
+          onPress={onGeneratePlan}
+          loading={isGenerating}
+          disabled={isGenerating}
           style={styles.actionPrimary}
-        >
-          <TouchableOpacity
-            style={styles.actionPrimaryGradient}
-            onPress={onGeneratePlan}
-            disabled={isGenerating}
-          >
-            <Text style={styles.actionPrimaryText}>✨ Generar Plan</Text>
-          </TouchableOpacity>
-        </LinearGradient>
-
-        <TouchableOpacity style={styles.actionGhost} onPress={onAddManual}>
-          <Text style={styles.actionGhostText}>➕ Añadir</Text>
-        </TouchableOpacity>
+        />
       </View>
 
       {/* 7 Cards Lun-Dom */}
@@ -722,14 +974,18 @@ function WeekTab({ weekWorkouts, onGeneratePlan, isGenerating, onAddManual, onOp
 
         if (isToday) {
           return (
-            <TodayCard
+            <View
               key={dateStr}
-              dateStr={dateStr}
-              workout={workout}
-              onPress={() => workout && onOpenDetail(workout, dateStr)}
-              onStop={onStopTimer}
-              styles={styles}
-            />
+              onLayout={(e) => onTodayCardLayout?.(e.nativeEvent.layout.y)}
+            >
+              <TodayCard
+                dateStr={dateStr}
+                workout={workout}
+                onPress={() => workout && onOpenDetail(workout, dateStr)}
+                onStop={onStopTimer}
+                styles={styles}
+              />
+            </View>
           );
         }
         if (isPast) {
@@ -753,33 +1009,44 @@ function WeekTab({ weekWorkouts, onGeneratePlan, isGenerating, onAddManual, onOp
           />
         );
       })}
-
-      {empty && (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>📋</Text>
-          <Text style={styles.emptyTitle}>Sin plan esta semana</Text>
-          <Text style={styles.emptyText}>
-            Genera un plan automático o añade tus entrenamientos manualmente.
-          </Text>
-        </View>
-      )}
     </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// EmptyHistoryState — Hermano gemelo de EmptyPlanState
+// ─────────────────────────────────────────────────────────────
+function EmptyHistoryState({ onGoToWeek, styles }) {
+  return (
+    <View style={styles.emptyPlanContainer}>
+      <View style={styles.emptyPlanIconWrap}>
+        <History color="#8E8E93" size={56} strokeWidth={1.5} />
+      </View>
+      <Text style={styles.emptyPlanTitle}>Tu Leyenda Empieza Aquí</Text>
+      <Text style={styles.emptyPlanText}>
+        Completa tu primer entrenamiento de la semana para que aparezca en tu bitácora.
+      </Text>
+      <TouchableOpacity
+        style={styles.emptyHistorySecondaryBtn}
+        onPress={onGoToWeek}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.emptyHistorySecondaryBtnText}>Ir a la semana actual</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
 // Pestaña Historial
 // ─────────────────────────────────────────────────────────────
-function HistoryTab({ historyWorkouts, onOpenDetail, styles }) {
+function HistoryTab({ historyWorkouts, onOpenDetail, onGoToWeek, styles }) {
   if (historyWorkouts.length === 0) {
     return (
-      <View style={styles.emptyState}>
-        <Text style={styles.emptyIcon}>🗂️</Text>
-        <Text style={styles.emptyTitle}>Sin historial todavía</Text>
-        <Text style={styles.emptyText}>
-          Aquí aparecerán tus entrenamientos completados semana a semana.
-        </Text>
-      </View>
+      <EmptyHistoryState
+        onGoToWeek={onGoToWeek}
+        styles={styles}
+      />
     );
   }
 
@@ -812,6 +1079,8 @@ function HistoryTab({ historyWorkouts, onOpenDetail, styles }) {
                     {formatDateLabel(item.fecha)}
                     {formatDuracion(item.duracion_min) ? `  ·  ${formatDuracion(item.duracion_min)}` : ''}
                     {item.tss_plan != null ? `  ·  TSS ${item.tss_plan}` : ''}
+                    {item.hora ? `  ·  ${item.hora}` : ''}
+                    {item.punto_encuentro ? `  ·  ${item.punto_encuentro}` : ''}
                   </Text>
                 </View>
                 <View style={[
@@ -841,12 +1110,14 @@ export function PlanView({
   weekWorkouts,
   historyWorkouts,
   markComplete,
+  saveFeedback,
   isGenerating,
   handleGeneratePlan,
   addManualWorkout,
   saveTimerSession,
   styles,
 }) {
+  const scrollViewRef = useRef(null);
   const [activeTab, setActiveTab] = useState('week');
   const [isManualModalVisible, setIsManualModalVisible] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState(null);
@@ -858,13 +1129,11 @@ export function PlanView({
 
   const { monday } = getWeekBounds();
 
-  const weekEnd = new Date(monday + 'T00:00:00');
-  weekEnd.setDate(weekEnd.getDate() + 6);
-  const weekEndStr = `${weekEnd.getDate()} ${MONTH_ABBR[weekEnd.getMonth()]}`;
-  const weekStartStr = (() => {
-    const d = new Date(monday + 'T00:00:00');
-    return `${d.getDate()} ${MONTH_ABBR[d.getMonth()]}`;
-  })();
+  const headerDateLabel = formatMonthYear(monday);
+  const { scrollHandler, HEADER_MAX_HEIGHT, interpolations, insets } = useCollapsibleHeader({ compact: true });
+
+  const isAnyModalVisible = !!selectedWorkout || isManualModalVisible || isGenerating || showFinishSheet;
+  useNavigationBarColor(isAnyModalVisible, '#131313', '#121212');
 
   function openDetail(workout, dateStr) {
     setSelectedWorkout(workout);
@@ -887,6 +1156,15 @@ export function PlanView({
     resetTimer();
   }
 
+  function handleTodayCardLayout(y) {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({
+        y: Math.max(0, y - 24),
+        animated: true,
+      });
+    }, 250);
+  }
+
   if (loading) {
     return (
       <ScreenWrapper style={styles.safeContainer}>
@@ -899,35 +1177,61 @@ export function PlanView({
   }
 
   return (
-    <ScreenWrapper style={styles.safeContainer}>
-      <ScrollView
+    <ScreenWrapper style={styles.safeContainer} edges={['left', 'right']}>
+      <CollapsibleHeader
+        editorialLabel={headerDateLabel}
+        editorialTitle="Mi Plan"
+        smallTitle="Mi Plan"
+        rightAction={
+          <AnimatedActionButton
+            label="Añadir"
+            icon={<Plus color="#00D2FF" size={20} strokeWidth={2.5} />}
+            onPress={() => setIsManualModalVisible(true)}
+            interpolations={interpolations}
+          />
+        }
+        interpolations={interpolations}
+        insets={insets}
+      />
+      <Animated.ScrollView
+        ref={scrollViewRef}
+        bounces={false}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: HEADER_MAX_HEIGHT }]}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerMeta}>{weekStartStr} – {weekEndStr}</Text>
-          <Text style={styles.headerTitle}>Plan de Entrenamiento</Text>
-        </View>
-
-        {/* Segmented Control */}
+        {/* Segmented Control — glassmorphism + Azul Neón (scroll horizontal) */}
         <View style={styles.segmented}>
-          <TouchableOpacity
-            style={[styles.segmentBtn, activeTab === 'week' && styles.segmentBtnActive]}
-            onPress={() => setActiveTab('week')}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.segmentedScrollContent}
+            style={styles.segmentedScrollView}
           >
-            <Text style={[styles.segmentText, activeTab === 'week' && styles.segmentTextActive]}>
-              Semana Actual
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.segmentBtn, activeTab === 'history' && styles.segmentBtnActive]}
-            onPress={() => setActiveTab('history')}
-          >
-            <Text style={[styles.segmentText, activeTab === 'history' && styles.segmentTextActive]}>
-              Historial
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.segmentedBtn, activeTab === 'week' && styles.segmentedBtnActive]}
+              onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setActiveTab('week');
+              }}
+            >
+              <Text style={[styles.segmentedText, activeTab === 'week' && styles.segmentedTextActive]}>
+                Semana Actual
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.segmentedBtn, activeTab === 'history' && styles.segmentedBtnActive]}
+              onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setActiveTab('history');
+              }}
+            >
+              <Text style={[styles.segmentedText, activeTab === 'history' && styles.segmentedTextActive]}>
+                Historial
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
 
         {/* Contenido según tab */}
@@ -936,19 +1240,23 @@ export function PlanView({
             weekWorkouts={weekWorkouts}
             onGeneratePlan={handleGeneratePlan}
             isGenerating={isGenerating}
-            onAddManual={() => setIsManualModalVisible(true)}
             onOpenDetail={openDetail}
             onStopTimer={stopTimer}
+            onTodayCardLayout={handleTodayCardLayout}
             styles={styles}
           />
         ) : (
           <HistoryTab
             historyWorkouts={historyWorkouts}
             onOpenDetail={openDetail}
+            onGoToWeek={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setActiveTab('week');
+            }}
             styles={styles}
           />
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Modals / Overlays */}
       <GeneratingOverlay visible={isGenerating} styles={styles} />
@@ -965,7 +1273,7 @@ export function PlanView({
         workout={selectedWorkout}
         dateStr={selectedDateStr}
         onClose={closeDetail}
-        onComplete={markComplete}
+        onSaveFeedback={saveFeedback}
         styles={styles}
       />
 
