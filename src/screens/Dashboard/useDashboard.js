@@ -1,6 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Alert } from 'react-native';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { AppState, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import * as Location from 'expo-location';
 import { supabase } from '../../../supabase';
+import { useUserContext } from '../../context/UserContext';
+import { useToast } from '../../context/ToastContext';
+
+if (
+  Platform.OS === 'android'
+  && !global?.nativeFabricUIManager
+  && UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+import { saveTodayPlan } from '../../services/offlineStorage';
+import { syncPendingEfforts } from '../../services/effortSync';
+import { MOTIVATIONAL_PHRASES } from '../../constants/phrases';
+import { PRIORIDADES } from '../../constants/prioridades';
+import { getWeekBounds } from '../../utils/dateUtils';
 
 const RPE_LABELS = {
   1: 'Suave / Recuperación',
@@ -15,31 +32,32 @@ const RPE_LABELS = {
   10: 'Máximo / Agónico',
 };
 
-function getWeekBounds() {
-  const today = new Date();
-  const day = today.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(today);
-  monday.setDate(today.getDate() + diff);
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  return {
-    monday: monday.toISOString().split('T')[0],
-    sunday: sunday.toISOString().split('T')[0],
-  };
+/**
+ * Obtiene la categoría horaria para las frases motivacionales.
+ * morning: 5-11, midday: 12-14, afternoon: 15-19, evening: 20-22, night: 23-4
+ */
+function getTimeCategory() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return 'morning';
+  if (h >= 12 && h < 15) return 'midday';
+  if (h >= 15 && h < 20) return 'afternoon';
+  if (h >= 20 && h < 23) return 'evening';
+  return 'night';
 }
 
-function getMotivationalMessage() {
-  const h = new Date().getHours();
-  if (h >= 5 && h < 12) return 'Tu ventana de rendimiento óptimo está abierta. ¡A entrenar!';
-  if (h >= 12 && h < 15) return 'Recarga energía. La calidad de hoy es la forma de mañana.';
-  if (h >= 15 && h < 20) return 'La tarde es tuya. Domina la sesión de hoy.';
-  if (h >= 20 && h < 23) return 'Termina el día con fuerza. Cada kilómetro cuenta.';
-  return 'El descanso es entrenamiento. Tu cuerpo mejora mientras duermes.';
+/**
+ * Selecciona una frase aleatoria de la categoría correspondiente a la hora actual.
+ */
+function getRandomMotivationalPhrase() {
+  const category = getTimeCategory();
+  const phrases = MOTIVATIONAL_PHRASES[category];
+  if (!phrases?.length) return '';
+  return phrases[Math.floor(Math.random() * phrases.length)];
 }
 
 export function useDashboard(user) {
+  const { profileData, racesRevision, refreshUserRaces } = useUserContext();
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [ctl, setCtl] = useState(null);
   const [atl, setAtl] = useState(null);
@@ -51,8 +69,14 @@ export function useDashboard(user) {
   const [hasReportedToday, setHasReportedToday] = useState(false);
   const [rpeValue, setRpeValue] = useState(5);
   const [submittingRpe, setSubmittingRpe] = useState(false);
-  const [nombre, setNombre] = useState('Atleta');
+  const [nombreLocal, setNombre] = useState('Atleta');
   const [proximaCarrera, setProximaCarrera] = useState(null);
+
+  // ─── Location & weather (auto-detect permission, geocode, clima) ───
+  const [city, setCity] = useState(null);
+  const [locationPermission, setLocationPermission] = useState('undetermined'); // 'undetermined' | 'granted' | 'denied'
+  const [loadingLocation, setLoadingLocation] = useState(true);
+  const [climaData, setClimaData] = useState(null); // { temp, condition, icon } | null
 
   const fetchTodayPlan = useCallback(async (userId) => {
     const hoy = new Date().toISOString().split('T')[0];
@@ -107,7 +131,7 @@ export function useDashboard(user) {
     const hoy = new Date().toISOString().split('T')[0];
     const { data } = await supabase
       .from('vista_calendario_atletas')
-      .select('id, nombre, fecha_inicio, fecha_fin, ciudad, distancia_km')
+      .select('*')
       .eq('user_id', userId)
       .gte('fecha_inicio', hoy)
       .order('fecha_inicio', { ascending: true })
@@ -121,17 +145,10 @@ export function useDashboard(user) {
       if (!user?.id) return;
       setLoading(true);
       try {
-        const { data: usuario, error } = await supabase
-          .from('usuarios')
-          .select('athlete_id, nombre')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        let athId = null;
-        if (!error) {
-          athId = usuario?.athlete_id ?? null;
-          if (usuario?.nombre) setNombre(usuario.nombre);
-        }
+        // athlete_id ya no existe en usuarios; se obtiene de integraciones_terceros (plataforma 'intervals')
+        const integracionIntervals = profileData?.integraciones?.find?.((i) => i.plataforma === 'intervals');
+        const athId = integracionIntervals?.id_externo ?? null;
+        if (profileData?.nombre) setNombre(profileData.nombre);
         setHasData(!!athId);
 
         const [plan, wellness, reported, tssPlaneado, proxCarrera] = await Promise.all([
@@ -143,7 +160,9 @@ export function useDashboard(user) {
         ]);
 
         setEntrenoHoy(plan);
+        if (plan) saveTodayPlan(plan).catch(() => {}); // Offline cache
         setHasReportedToday(reported);
+        syncPendingEfforts(user.id).catch(() => {}); // Sincronizar esfuerzos guardados offline
         setTssPlaneadoSemanal(tssPlaneado);
         setProximaCarrera(proxCarrera);
 
@@ -160,7 +179,120 @@ export function useDashboard(user) {
       }
     }
     loadData();
-  }, [user?.id, fetchTodayPlan, fetchWellness, fetchEsfuerzoHoy, fetchTssPlaneadoSemanal, fetchProximaCarrera]);
+  }, [user?.id, profileData?.integraciones, profileData?.nombre, fetchTodayPlan, fetchWellness, fetchEsfuerzoHoy, fetchTssPlaneadoSemanal, fetchProximaCarrera]);
+
+  // ─── Refresco de próxima carrera cuando cambian inscripciones ───
+  useEffect(() => {
+    if (!user?.id || racesRevision === 0) return;
+    let cancelled = false;
+    (async () => {
+      const data = await fetchProximaCarrera(user.id);
+      if (cancelled) return;
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setProximaCarrera(data ?? null);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, racesRevision, fetchProximaCarrera]);
+
+  // ─── Ubicación: verificar permisos al montar y obtener ciudad si está concedido ───
+  const fetchLocationAndCity = useCallback(async () => {
+    try {
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const { latitude, longitude } = pos.coords;
+      const geo = await Location.reverseGeocodeAsync({ latitude, longitude });
+      const cityName = geo?.[0]?.city ?? geo?.[0]?.district ?? geo?.[0]?.region ?? null;
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setCity(cityName);
+      // Mock clima (sustituir por OpenWeather cuando se integre)
+      setClimaData({ temp: 24, condition: 'Despejado', icon: 'sun' });
+    } catch {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setCity(null);
+      setClimaData(null);
+    }
+  }, []);
+
+  const fetchLocationAndCityRef = useRef(fetchLocationAndCity);
+  fetchLocationAndCityRef.current = fetchLocationAndCity;
+  const cityRef = useRef(city);
+  cityRef.current = city;
+
+  // Refresca ubicación cada vez que el usuario entra al Dashboard (dinámico)
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        setLoadingLocation(true);
+        try {
+          const { status } = await Location.getForegroundPermissionsAsync();
+          if (cancelled) return;
+          setLocationPermission(status);
+
+          if (status === 'granted') {
+            await fetchLocationAndCityRef.current();
+          } else {
+            setCity(null);
+            setClimaData(null);
+          }
+        } catch {
+          if (cancelled) return;
+          setLocationPermission('denied');
+          setCity(null);
+          setClimaData(null);
+        } finally {
+          if (!cancelled) setLoadingLocation(false);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [])
+  );
+
+  // AppState listener: usuario va a Ajustes → concede permiso → vuelve a la app (Android)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState !== 'active') return;
+      (async () => {
+        try {
+          const { status } = await Location.getForegroundPermissionsAsync();
+          setLocationPermission(status);
+          if (status === 'granted' && !cityRef.current) {
+            setLoadingLocation(true);
+            try {
+              await fetchLocationAndCityRef.current();
+            } finally {
+              setLoadingLocation(false);
+            }
+          }
+        } catch {
+          setLoadingLocation(false);
+        }
+      })();
+    });
+    return () => subscription.remove();
+  }, []);
+
+  const onRequestLocation = useCallback(async () => {
+    setLoadingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      setLocationPermission(status);
+      if (status === 'granted') {
+        // Disparo inmediato: Android requiere llamar explícitamente tras granted
+        await fetchLocationAndCityRef.current();
+      } else {
+        setCity(null);
+        setClimaData(null);
+      }
+    } catch {
+      setLocationPermission('denied');
+      setCity(null);
+      setClimaData(null);
+    } finally {
+      setLoadingLocation(false);
+    }
+  }, []);
 
   const saveRPE = useCallback(async () => {
     if (!user?.id || rpeValue < 1 || rpeValue > 10) return;
@@ -173,13 +305,47 @@ export function useDashboard(user) {
       if (error) throw error;
       setHasReportedToday(true);
     } catch (err) {
-      Alert.alert('Error', err.message || 'No se pudo registrar el esfuerzo.');
+      showToast({ type: 'error', title: 'Error', message: err.message || 'No se pudo registrar el esfuerzo.' });
     } finally {
       setSubmittingRpe(false);
     }
   }, [user?.id, rpeValue]);
 
   const handleVincular = useCallback(() => {}, []);
+
+  const enrollToRace = useCallback(async (carreraId, prioridad = 'B') => {
+    if (!user?.id || !carreraId) throw new Error('Datos insuficientes.');
+    const p = PRIORIDADES.includes(prioridad) ? prioridad : 'B';
+    const { error } = await supabase
+      .from('usuario_carreras')
+      .upsert(
+        { user_id: user.id, carrera_id: carreraId, prioridad: p },
+        { onConflict: 'user_id,carrera_id' }
+      );
+    if (error) throw error;
+    const data = await fetchProximaCarrera(user.id);
+    setProximaCarrera(data);
+    refreshUserRaces();
+    showToast('¡Meta fijada! Nos vemos en la línea de salida');
+  }, [user?.id, fetchProximaCarrera, refreshUserRaces, showToast]);
+
+  const unenrollFromRace = useCallback(async (carreraId) => {
+    if (!user?.id || !carreraId) throw new Error('Datos insuficientes.');
+    const { data: inscripcion, error: selError } = await supabase
+      .from('usuario_carreras')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('carrera_id', carreraId)
+      .maybeSingle();
+    if (selError) throw selError;
+    if (!inscripcion) throw new Error('No se encontró la inscripción para cancelar.');
+    const { error } = await supabase.from('usuario_carreras').delete().eq('id', inscripcion.id);
+    if (error) throw error;
+    const data = await fetchProximaCarrera(user.id);
+    setProximaCarrera(data);
+    refreshUserRaces();
+    showToast('Inscripción cancelada. El calendario se ha actualizado');
+  }, [user?.id, fetchProximaCarrera, refreshUserRaces, showToast]);
 
   const getRpeColor = useCallback((value) => {
     const v = Math.round(value);
@@ -194,6 +360,15 @@ export function useDashboard(user) {
     ? Math.min(Math.round(((tssSemanal || 0) / tssPlaneadoSemanal) * 100), 100)
     : 0;
 
+  /**
+   * Readiness: deriva de TSB (Training Stress Balance).
+   * TSB > 0 = fresco, TSB < 0 = fatigado.
+   * Mapeo: TSB -30..+30 → 0..100 aprox.
+   */
+  const readinessPct = tsb != null
+    ? Math.min(100, Math.max(0, Math.round(50 + (Number(tsb) * 1.8))))
+    : 75;
+
   // Compute days until next race (based on fecha_inicio — when athlete travels/starts)
   const diasParaCarrera = proximaCarrera?.fecha_inicio
     ? Math.max(0, Math.ceil(
@@ -201,9 +376,12 @@ export function useDashboard(user) {
       ))
     : null;
 
+  // Frase motivacional aleatoria por franja horaria (estable durante la sesión)
+  const motivationalMessage = useMemo(() => getRandomMotivationalPhrase(), []);
+
   return {
     loading,
-    nombre: nombre || user?.email?.split('@')[0] || 'Atleta',
+    nombre: profileData?.nombre || nombreLocal || user?.email?.split('@')[0] || 'Atleta',
     ctl,
     atl,
     tsb,
@@ -220,8 +398,16 @@ export function useDashboard(user) {
     handleVincular,
     getRpeColor,
     rpeLabel: RPE_LABELS[rpeValue] || '',
-    motivationalMessage: getMotivationalMessage(),
+    motivationalMessage,
     proximaCarrera,
     diasParaCarrera,
+    city,
+    locationPermission,
+    loadingLocation,
+    climaData,
+    onRequestLocation,
+    readinessPct,
+    enrollToRace,
+    unenrollFromRace,
   };
 }

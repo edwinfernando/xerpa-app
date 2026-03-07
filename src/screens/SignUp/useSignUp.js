@@ -1,72 +1,125 @@
 import { useState } from 'react';
-import { Alert } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-import { makeRedirectUri } from 'expo-auth-session';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../../supabase';
+import { useToast } from '../../context/ToastContext';
 
-WebBrowser.maybeCompleteAuthSession();
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ONBOARDING_KEY = 'xerpa_onboarding';
 
-const redirectUri = makeRedirectUri({ scheme: 'xerpa-app' });
+function mapSignUpError(message) {
+  const msg = (message || '').toLowerCase();
+  if (msg.includes('already registered') || msg.includes('already exists')) {
+    return 'Este correo ya está registrado. Inicia sesión o usa otro.';
+  }
+  if (msg.includes('invalid email')) {
+    return 'Por favor, ingresa un correo electrónico válido.';
+  }
+  if (msg.includes('weak') || msg.includes('password')) {
+    return 'La contraseña debe tener al menos 6 caracteres.';
+  }
+  if (msg.includes('rate limit') || msg.includes('too many')) {
+    return 'Demasiados intentos. Espera un momento e inténtalo de nuevo.';
+  }
+  return message || 'Ocurrió un error. Intenta de nuevo.';
+}
 
 export function useSignUp() {
-  const [loadingGoogle, setLoadingGoogle] = useState(false);
-  const [loadingApple, setLoadingApple] = useState(false);
+  const { showToast } = useToast();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loadingForm, setLoadingForm] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [globalAuthError, setGlobalAuthError] = useState('');
 
-  const handleGoogleSignIn = async () => {
-    setLoadingGoogle(true);
+  const clearErrors = () => {
+    setEmailError('');
+    setPasswordError('');
+    setGlobalAuthError('');
+  };
+
+  const handleCreateAccount = async (onSuccess) => {
+    clearErrors();
+    let hasError = false;
+
+    if (!email.trim()) {
+      setEmailError('El correo es obligatorio.');
+      hasError = true;
+    } else if (!EMAIL_REGEX.test(email.trim())) {
+      setEmailError('Ingresa un correo electrónico válido.');
+      hasError = true;
+    }
+
+    if (!password) {
+      setPasswordError('La contraseña es obligatoria.');
+      hasError = true;
+    } else if (password.length < 6) {
+      setPasswordError('La contraseña debe tener al menos 6 caracteres.');
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    setLoadingForm(true);
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUri,
-          skipBrowserRedirect: true,
-        },
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
       });
 
-      if (error) throw error;
-
-      if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
-        if (result.type === 'cancel') {
-          Alert.alert('Cancelado', 'Inicio de sesión con Google cancelado.');
-        }
+      if (error) {
+        setGlobalAuthError(mapSignUpError(error.message));
+        return;
       }
+
+      const user = data?.user;
+      if (!user?.id) {
+        setGlobalAuthError('No se pudo completar el registro. Intenta de nuevo.');
+        return;
+      }
+
+      // La fila en usuarios se crea automáticamente por trigger on_auth_user_created
+
+      await AsyncStorage.setItem(
+        ONBOARDING_KEY,
+        JSON.stringify({ isNewUser: true, userRole: 'Atleta' })
+      );
+
+      onSuccess?.();
     } catch (err) {
-      Alert.alert('Error', err.message);
+      setGlobalAuthError(err?.message || 'Error inesperado. Intenta de nuevo.');
     } finally {
-      setLoadingGoogle(false);
+      setLoadingForm(false);
     }
   };
 
-  const handleAppleSignIn = async () => {
-    setLoadingApple(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
-        options: {
-          redirectTo: redirectUri,
-          skipBrowserRedirect: true,
-        },
-      });
+  const handleGoogleSignIn = () => {
+    showToast({ type: 'info', title: 'Próximamente', message: 'El registro con Google estará disponible pronto.' });
+  };
 
-      if (error) throw error;
+  const handleAppleSignIn = () => {
+    showToast({ type: 'info', title: 'Próximamente', message: 'El registro con Apple estará disponible pronto.' });
+  };
 
-      if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
-        if (result.type === 'cancel') {
-          Alert.alert('Cancelado', 'Inicio de sesión con Apple cancelado.');
-        }
-      }
-    } catch (err) {
-      Alert.alert('Error', err.message);
-    } finally {
-      setLoadingApple(false);
-    }
+  const handleSetEmail = (text) => {
+    setEmail(text);
+    if (emailError || globalAuthError) clearErrors();
+  };
+  const handleSetPassword = (text) => {
+    setPassword(text);
+    if (passwordError || globalAuthError) clearErrors();
   };
 
   return {
-    loadingGoogle,
-    loadingApple,
+    email,
+    setEmail: handleSetEmail,
+    password,
+    setPassword: handleSetPassword,
+    loadingForm,
+    emailError,
+    passwordError,
+    globalAuthError,
+    handleCreateAccount,
     handleGoogleSignIn,
     handleAppleSignIn,
   };

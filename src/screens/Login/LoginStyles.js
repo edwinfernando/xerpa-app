@@ -1,58 +1,69 @@
 import { StyleSheet } from 'react-native';
-import { theme } from '../../styles/theme';
+import { theme } from '../../theme/theme';
+
+const TOUCH_MIN = theme.TOUCH_TARGET_MIN;
+const BUTTON_RADIUS = 14;
 
 export const loginStyles = StyleSheet.create({
   safeContainer: {
     flex: 1,
   },
-  container: {
+  mainContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: theme.spacing.screenPadding,
+  },
+  keyboardAvoid: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: theme.SCREEN_PADDING_HORIZONTAL,
+    paddingVertical: 24,
+    paddingBottom: 80,
   },
   logo: {
-    width: 160,
-    height: 160,
-    borderRadius: 0,
-    marginBottom: 0,
+    width: 140,
+    height: 140,
+    marginBottom: 8,
   },
   title: {
-    color: '#fff',
+    color: theme.colors.text,
     fontSize: 48,
     fontWeight: '900',
     letterSpacing: -2,
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   subtitle: {
-    color: '#888888',
+    color: theme.colors.textMuted,
     fontSize: 16,
-    marginBottom: 28,
+    marginBottom: 40,
     textAlign: 'center',
     fontWeight: '500',
   },
   inputContainer: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 24,
   },
   inputWrapper: {
-    width: '90%',
-    marginBottom: 16,
+    width: '100%',
+    marginBottom: 20,
   },
   input: {
     width: '100%',
-    backgroundColor: '#1E1E1E',
-    color: '#fff',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: theme.colors.surfaceInput,
+    color: theme.colors.text,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
     borderWidth: 1,
-    borderColor: '#333333',
-    fontSize: 16,
+    borderColor: theme.colors.border,
+    fontSize: theme.INPUT_FONT_SIZE_MIN,
   },
   inputError: {
-    borderColor: '#FF4444',
+    borderColor: theme.colors.danger,
   },
   // Contenedor relativo para el campo contraseña + ícono ojo
   passwordContainer: {
@@ -63,66 +74,72 @@ export const loginStyles = StyleSheet.create({
     paddingRight: 52,
   },
   eyeButton: {
-    position: 'absolute',
-    right: 14,
-    top: 0,
-    bottom: 0,
+    minWidth: TOUCH_MIN,
+    minHeight: TOUCH_MIN,
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    alignItems: 'center',
+    paddingHorizontal: 12,
   },
   helperText: {
-    color: '#FF4444',
+    color: theme.colors.danger,
     fontSize: 12,
     marginTop: 6,
     marginLeft: 4,
   },
-  // Error global de Supabase — centrado, encima del botón
   globalAuthError: {
-    width: '90%',
+    width: '100%',
     textAlign: 'center',
-    color: '#FF4444',
+    color: theme.colors.danger,
     fontSize: 13,
     fontWeight: '500',
-    marginBottom: 12,
+    marginBottom: 20,
     lineHeight: 18,
   },
-  buttonGradient: {
-    width: '90%',
-    borderRadius: 12,
+  buttonRow: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  primaryButton: {
+    width: '100%',
+    height: theme.BUTTON_HEIGHT,
+    borderRadius: BUTTON_RADIUS,
     marginBottom: 0,
   },
-  button: {
-    padding: 16,
-    alignItems: 'center',
-    borderRadius: 12,
-  },
-  buttonText: {
-    color: '#121212',
-    fontWeight: 'bold',
-    fontSize: 16,
-    letterSpacing: 1,
-  },
-  // Enlace sutil inmediatamente debajo del botón principal
-  forgotPasswordLink: {
-    marginTop: 15,
-    alignItems: 'center',
+  forgotPasswordTouch: {
+    marginTop: 20,
+    justifyContent: 'center',
+    paddingVertical: 10,
   },
   forgotPasswordText: {
-    color: '#666666',
+    color: theme.colors.textQuaternary,
     fontSize: 13,
+    fontWeight: '500',
   },
-  // Enlace anclado al fondo de la pantalla
-  registerContainer: {
+  footerFixed: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 0,
+    left: 0,
+    right: 0,
     alignItems: 'center',
+    paddingBottom: 20,
+    backgroundColor: theme.colors.background,
+  },
+  registerTouch: {
+    paddingVertical: 10,
+    justifyContent: 'center',
+  },
+  contentBlock: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
   },
   registerText: {
-    color: '#888888',
-    fontSize: 15,
+    color: theme.colors.textMuted,
+    fontSize: 14,
   },
   registerHighlight: {
-    color: '#00F0FF',
-    fontWeight: 'bold',
+    color: theme.colors.primary,
+    fontWeight: '600',
   },
 });

@@ -1,8 +1,7 @@
 /**
  * Centralizador de errores XERPA.
- * Muestra Alert con título contextual y mensajes amigables según código.
+ * Muestra feedback vía showToast (sin Alert nativo).
  */
-import { Alert } from 'react-native';
 
 const FRIENDLY_MESSAGES = {
   '23505': 'Ya estás inscrito en esta carrera.',
@@ -12,11 +11,13 @@ const FRIENDLY_MESSAGES = {
 /**
  * @param {Error|{ message?: string, code?: string }} error
  * @param {string} contextCode - Ej: "RACE-INS-01", "RACE-DEL-01"
+ * @param {(payload: { type: string, title: string, message: string }) => void} showToast
  */
-export function showXerpaError(error, contextCode) {
+export function showXerpaError(error, contextCode, showToast) {
+  if (!showToast) return;
   const code = error?.code ?? null;
   const friendly = code ? FRIENDLY_MESSAGES[code] : null;
   const message = friendly ?? error?.message ?? 'Ha ocurrido un error inesperado.';
 
-  Alert.alert(`⚠️ Error XERPA [${contextCode}]`, message);
+  showToast({ type: 'error', title: `Error XERPA [${contextCode}]`, message });
 }

@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { theme } from '../../styles/theme';
+import { theme } from '../../theme/theme';
 
 export const xerpaAIStyles = StyleSheet.create({
   safeContainer: {
@@ -8,12 +8,18 @@ export const xerpaAIStyles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingHorizontal: theme.spacing.screenPadding,
+  },
+  chatInner: {
+    flex: 1,
+  },
+  messagesListWrapper: {
+    flex: 1,
   },
   messagesList: {
     flexGrow: 1,
     paddingVertical: 20,
     paddingBottom: 8,
+    paddingHorizontal: theme.SCREEN_PADDING_HORIZONTAL,
   },
   bubbleUser: {
     alignSelf: 'flex-end',
@@ -74,27 +80,40 @@ export const xerpaAIStyles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingVertical: 16,
+    width: '100%',
+    paddingHorizontal: theme.SCREEN_PADDING_HORIZONTAL,
+    paddingTop: 12,
+    paddingBottom: 12,
+    marginBottom: 0,
     gap: 12,
+    backgroundColor: theme.colors.background,
+    borderTopWidth: 1,
+    borderTopColor: '#1A1A1A',
   },
-  input: {
+  chatInput: {
     flex: 1,
     backgroundColor: '#1E1E1E',
     color: '#fff',
-    paddingVertical: 12,
-    paddingHorizontal: 18,
+    paddingLeft: 15,
+    paddingRight: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
     borderRadius: 24,
-    fontSize: 15,
+    fontSize: theme.INPUT_FONT_SIZE_MIN,
+    lineHeight: 22,
     borderWidth: 1,
     borderColor: '#333',
-    maxHeight: 100,
+    textAlignVertical: 'top',
   },
   sendButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#39FF14',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sendButtonDisabled: {
+    opacity: 0.5,
   },
 });

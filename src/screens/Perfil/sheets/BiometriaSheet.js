@@ -1,7 +1,7 @@
 /**
  * BiometriaSheet — BottomSheet de edición: Información Personal y Biometría
  */
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,10 @@ import {
   ScrollView,
 } from 'react-native';
 import Modal from 'react-native-modal';
-import { theme } from '../../../theme/theme';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { ROL_OPTIONS } from '../PerfilStyles';
+import { useModalSwipeScroll } from '../../../hooks/useModalSwipeScroll';
 
 export function BiometriaSheet({
   visible,
@@ -38,23 +38,14 @@ export function BiometriaSheet({
   saving,
   styles,
 }) {
-  const [scrollOffsetY, setScrollOffsetY] = useState(0);
-  const scrollViewRef = useRef(null);
-  const scrollOffsetRef = useRef(0);
   const SWIPE_HEADER_HEIGHT = 100;
-
-  const propagateSwipe = useCallback((evt) => {
-    const locationY = evt?.nativeEvent?.locationY ?? 0;
-    return locationY > SWIPE_HEADER_HEIGHT;
-  }, []);
-
-  const scrollTo = useCallback((offset) => {
-    if (offset && typeof offset.y === 'number') {
-      const currentY = scrollOffsetRef.current;
-      const newY = Math.max(0, currentY + offset.y);
-      scrollViewRef.current?.scrollTo({ y: newY, animated: false });
-    }
-  }, []);
+  const {
+    scrollViewRef,
+    scrollOffsetY,
+    propagateSwipe,
+    scrollTo,
+    onScroll,
+  } = useModalSwipeScroll(SWIPE_HEADER_HEIGHT, visible);
 
   return (
     <Modal
@@ -88,12 +79,7 @@ export function BiometriaSheet({
             decelerationRate="fast"
             keyboardShouldPersistTaps="handled"
             overScrollMode="never"
-            onScroll={(e) => {
-              const currentOffset = e.nativeEvent.contentOffset.y;
-              const y = currentOffset < 0 ? 0 : currentOffset;
-              setScrollOffsetY(y);
-              scrollOffsetRef.current = y;
-            }}
+            onScroll={onScroll}
             scrollEventThrottle={16}
           >
             <Text style={styles.sheetLabel}>Nombre *</Text>

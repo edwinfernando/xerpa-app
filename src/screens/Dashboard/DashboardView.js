@@ -1,54 +1,69 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
-  ScrollView,
+  Animated,
   TouchableOpacity,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { ScreenWrapper } from '../../components/ScreenWrapper';
+import { CollapsibleHeader } from '../../components/CollapsibleHeader';
+import { useCollapsibleHeader } from '../../hooks/useCollapsibleHeader';
+import { Button } from '../../components/ui/Button';
+import { XerpaProgress } from '../../components/ui/XerpaProgress';
+import { CircularProgress } from '../../components/ui/CircularProgress';
 import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  Bike, Zap, Droplets, Dumbbell, Activity,
-  Moon, Trophy, AlertTriangle, Bot, RefreshCw,
-  MapPin, Calendar,
+  Moon, Trophy, MapPin, Calendar, Sun, Cloud, Cpu,
+  RefreshCw,
 } from 'lucide-react-native';
+import { RaceDetailSheet } from '../../components/races/RaceDetailSheet';
+import { raceCalendarStyles } from '../RaceCalendar/RaceCalendarStyles';
 import { formatDateRange } from '../../utils/formatDateRange';
+import { getProgressColorByPct } from '../../utils/colors';
+import { formatDuracionOrPlaceholder } from '../../utils/formatDuracion';
+import { getWorkoutIcon } from '../../utils/workoutTypeConfig';
+import { AnimatedActionButton } from '../../components/ui/AnimatedActionButton';
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
-const RING_SEGMENTS = 40;
-
-function formatDuracion(min) {
-  if (!min || min === 0) return '—';
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return h > 0 ? `${h}h ${m > 0 ? `${m}m` : ''}`.trim() : `${m}m`;
-}
-
-function getWorkoutIcon(tipo) {
-  const t = (tipo || '').toLowerCase();
-  if (t.includes('ride') || t.includes('bici') || t.includes('cycling')) return Bike;
-  if (t.includes('run') || t.includes('correr') || t.includes('running')) return Zap;
-  if (t.includes('swim') || t.includes('natac')) return Droplets;
-  if (t.includes('strength') || t.includes('fuerza')) return Dumbbell;
-  return Activity;
+function getGreeting() {
+  const hour = new Date().getHours();
+  return hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
 }
 
 // ─────────────────────────────────────────────────────────────
-// TSS Progress Ring — segmented dot ring
+// HeroCoachCard — Centro de mando biométrico (IA + Readiness + Clima)
 // ─────────────────────────────────────────────────────────────
-function ProgressRing({ percentage = 0, size = 168, styles }) {
-  const filled = Math.round((Math.min(Math.max(percentage, 0), 100) / 100) * RING_SEGMENTS);
-  const radius = size / 2 - 16;
+const READINESS_RING_SEGMENTS = 48;
+
+const getReadinessColor = getProgressColorByPct;
+
+function getReadinessMessage(nombre, pct) {
+  const name = nombre || 'Atleta';
+  if (pct > 80) {
+    return `Hola ${name}, tu Readiness es óptimo. ¿Revisamos la estrategia de hoy?`;
+  }
+  if (pct >= 50) {
+    return `Hola ${name}, tu Readiness es moderado. Podemos ajustar la intensidad si lo necesitas.`;
+  }
+  return `Hola ${name}, tu Readiness está bajo. Prioriza la recuperación hoy.`;
+}
+
+function ReadinessCircle({ percentage = 0, size = 140, styles }) {
+  const pct = Math.min(100, Math.max(0, Math.round(percentage ?? 0)));
+  const color = getReadinessColor(pct);
+  const filled = Math.round((pct / 100) * READINESS_RING_SEGMENTS);
+  const radius = size / 2 - 12;
   const center = size / 2;
 
   return (
-    <View style={[styles.tssRingWrapper, { width: size, height: size }]}>
-      {Array.from({ length: RING_SEGMENTS }, (_, i) => {
-        const angleDeg = (i / RING_SEGMENTS) * 360 - 90;
+    <View style={[styles.heroReadinessRingWrap, { width: size, height: size }]}>
+      {Array.from({ length: READINESS_RING_SEGMENTS }, (_, i) => {
+        const angleDeg = (i / READINESS_RING_SEGMENTS) * 360 - 90;
         const angleRad = (angleDeg * Math.PI) / 180;
         const cx = center + radius * Math.cos(angleRad);
         const cy = center + radius * Math.sin(angleRad);
@@ -58,94 +73,147 @@ function ProgressRing({ percentage = 0, size = 168, styles }) {
             key={i}
             style={{
               position: 'absolute',
-              width: 5,
-              height: active ? 13 : 9,
-              borderRadius: 3,
-              backgroundColor: active ? '#00F0FF' : '#1E1E1E',
-              left: cx - 2.5,
-              top: cy - (active ? 6.5 : 4.5),
+              width: 4,
+              height: active ? 10 : 7,
+              borderRadius: 2,
+              backgroundColor: active ? color : '#1E1E1E',
+              left: cx - 2,
+              top: cy - (active ? 5 : 3.5),
               transform: [{ rotate: `${angleDeg + 90}deg` }],
-              shadowColor: active ? '#00F0FF' : 'transparent',
+              shadowColor: active ? color : 'transparent',
               shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: active ? 0.9 : 0,
-              shadowRadius: 5,
+              shadowOpacity: active ? 0.8 : 0,
+              shadowRadius: 4,
             }}
           />
         );
       })}
-      {/* Center content */}
-      <View style={{
-        position: 'absolute',
-        width: size,
-        height: size,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        <Text style={styles.tssRingCenterPct}>{percentage}%</Text>
-        <Text style={styles.tssRingCenterLabel}>TSS SEMANAL</Text>
+      <View style={[styles.heroReadinessRingCenter, { width: size, height: size }]}>
+        <Text
+          style={[
+            styles.heroReadinessNumber,
+            {
+              color,
+              textShadowColor: `${color}80`,
+              textShadowOffset: { width: 0, height: 0 },
+              textShadowRadius: 10,
+            },
+          ]}
+        >
+          {pct}
+        </Text>
+        <Text style={styles.heroReadinessLabel}>readiness</Text>
       </View>
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// Header
-// ─────────────────────────────────────────────────────────────
-function HeaderSection({ nombre, motivationalMessage, styles }) {
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Buenos días,' : hour < 19 ? 'Buenas tardes,' : 'Buenas noches,';
+function HeroCoachCard({
+  nombre,
+  readinessPct,
+  onPressXerpa,
+  city,
+  climaData,
+  locationPermission,
+  loadingLocation,
+  onRequestLocation,
+  styles,
+}) {
+  const message = getReadinessMessage(nombre, readinessPct ?? 0);
+
+  const hasLocation = !!city;
+  const WeatherIcon = climaData?.icon === 'cloud' ? Cloud : Sun;
+
+  const handlePress = () => {
+    onPressXerpa?.();
+  };
 
   return (
-    <View>
-      <Text style={styles.headerGreeting}>{greeting}</Text>
-      <Text style={styles.headerName}>{nombre} 👋</Text>
-      <Text style={styles.motivationalText}>{motivationalMessage}</Text>
-    </View>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Weather Banner (placeholder — connects to weather API)
-// ─────────────────────────────────────────────────────────────
-function WeatherBanner({ styles }) {
-  return (
-    <View style={styles.weatherBanner}>
-      <View style={styles.weatherLeft}>
-        <MapPin color="#555" size={16} />
-        <View>
-          <Text style={styles.weatherCity}>Tu Ciudad</Text>
-          <Text style={styles.weatherCondition}>Activa ubicación</Text>
+    <TouchableOpacity
+      style={styles.heroCoachCard}
+      onPress={handlePress}
+      activeOpacity={0.9}
+    >
+      {/* Fila superior — Clima */}
+      <View style={styles.heroTopRow}>
+        <Text style={styles.heroLabel}>XERPA AI COACH</Text>
+        <View style={styles.heroWeatherRight}>
+          {!hasLocation ? (
+            <TouchableOpacity
+              onPress={onRequestLocation}
+              disabled={loadingLocation}
+              style={styles.heroLocationBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <MapPin color="#00F0FF" size={18} />
+            </TouchableOpacity>
+          ) : climaData ? (
+            <View style={styles.heroWeatherRow}>
+              <WeatherIcon color="#00F0FF" size={16} />
+              <Text style={styles.heroWeatherText}>
+                {climaData.temp}°C — {climaData.condition}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
-      <View style={styles.weatherConnectBtn}>
-        <Text style={styles.weatherConnectText}>Conectar →</Text>
+
+      {/* Sección central — Readiness anillo */}
+      <View style={styles.heroReadinessSection}>
+        <ReadinessCircle percentage={readinessPct} size={140} styles={styles} />
       </View>
-    </View>
+
+      {/* Sección inferior — Mensaje IA */}
+      <View style={styles.heroMessageSection}>
+        <View style={styles.heroMessageInner}>
+          <Cpu color="#00D2FF" size={20} strokeWidth={2.5} />
+          <Text style={styles.heroMessageText} numberOfLines={2}>
+            {message}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
-// TSS Progress Section
+// Misión de Hoy — Colores dinámicos según intensidad
 // ─────────────────────────────────────────────────────────────
-function TSSSection({ tssSemanal, tssPlaneadoSemanal, tssProgressPct, styles }) {
-  return (
-    <View style={styles.tssSectionCard}>
-      <Text style={styles.sectionLabel}>PROGRESO SEMANAL</Text>
-      <ProgressRing percentage={tssProgressPct} styles={styles} />
-      <View style={styles.tssNumbersRow}>
-        <Text style={styles.tssActualValue}>{tssSemanal ?? '—'}</Text>
-        <Text style={styles.tssActualLabel}> TSS</Text>
-        <Text style={styles.tssDivider}> / </Text>
-        <Text style={styles.tssPlannedValue}>{tssPlaneadoSemanal > 0 ? tssPlaneadoSemanal : '—'}</Text>
-        <Text style={styles.tssPlannedLabel}> planificado</Text>
-      </View>
-    </View>
-  );
+const MISION_INTENSIDAD = {
+  alta: { gradient: ['#FF9800', '#FF5252'], iconColor: '#FF5252' },
+  media: { gradient: ['#00D2FF', '#007BFF'], iconColor: '#00D2FF' },
+  recuperacion: { gradient: ['#39FF14', '#00C853'], iconColor: '#39FF14' },
+};
+
+function getWorkoutIntensity(entreno) {
+  if (!entreno) return MISION_INTENSIDAD.recuperacion;
+
+  const tss = Number(entreno.tss_plan) || 0;
+  const texto = `${entreno.titulo || ''} ${entreno.tipo || ''}`.toLowerCase();
+
+  // Alta: TSS > 80 o palabras clave
+  if (tss > 80 || /series|umbral|race/.test(texto)) {
+    return MISION_INTENSIDAD.alta;
+  }
+
+  // Recuperación: TSS < 40 o palabras clave
+  if (tss > 0 && tss < 40) return MISION_INTENSIDAD.recuperacion;
+  if (/recuperaci[oó]n|active recovery|suave|descanso/.test(texto)) {
+    return MISION_INTENSIDAD.recuperacion;
+  }
+
+  // Media: TSS 40–80 o Base, Tempo
+  if (tss >= 40 && tss <= 80) return MISION_INTENSIDAD.media;
+  if (/base|tempo/.test(texto)) return MISION_INTENSIDAD.media;
+
+  // Inferir por duración si no hay TSS
+  const dur = entreno.duracion_min || 0;
+  if (dur >= 120) return MISION_INTENSIDAD.alta;
+  if (dur <= 45) return MISION_INTENSIDAD.recuperacion;
+
+  return MISION_INTENSIDAD.media;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Misión de Hoy
-// ─────────────────────────────────────────────────────────────
 function MisionHoy({ entreno, styles }) {
   if (!entreno) {
     return (
@@ -160,26 +228,38 @@ function MisionHoy({ entreno, styles }) {
   }
 
   const WorkoutIcon = getWorkoutIcon(entreno.tipo);
+  const { gradient, iconColor } = getWorkoutIntensity(entreno);
+
+  const gradientStyle = [
+    styles.misionGradient,
+    {
+      shadowColor: iconColor,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.4,
+      shadowRadius: 10,
+      elevation: 8,
+    },
+  ];
 
   return (
     <LinearGradient
-      colors={['#00F0FF', '#39FF14']}
+      colors={gradient}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={styles.misionGradient}
+      style={gradientStyle}
     >
       <View style={styles.misionInner}>
         <View style={styles.misionHeader}>
           <Text style={styles.misionLabel}>MISIÓN DE HOY</Text>
           {!!entreno.tipo && (
-            <View style={styles.misionTypePill}>
-              <Text style={styles.misionTypePillText}>{entreno.tipo}</Text>
+            <View style={[styles.misionTypePill, { borderColor: `${iconColor}40`, backgroundColor: `${iconColor}15` }]}>
+              <Text style={[styles.misionTypePillText, { color: iconColor }]}>{entreno.tipo}</Text>
             </View>
           )}
         </View>
         <View style={styles.misionIconRow}>
-          <View style={styles.misionIconBox}>
-            <WorkoutIcon color="#39FF14" size={24} />
+          <View style={[styles.misionIconBox, { borderColor: `${iconColor}40`, backgroundColor: `${iconColor}12` }]}>
+            <WorkoutIcon color={iconColor} size={24} />
           </View>
           <Text style={styles.misionTitle}>{entreno.titulo || 'Entrenamiento'}</Text>
         </View>
@@ -187,13 +267,25 @@ function MisionHoy({ entreno, styles }) {
           {!!entreno.duracion_min && (
             <View style={styles.misionMetaItem}>
               <Text style={styles.misionMetaLabel}>Duración:</Text>
-              <Text style={styles.misionMetaValue}> {formatDuracion(entreno.duracion_min)}</Text>
+              <Text style={styles.misionMetaValue}> {formatDuracionOrPlaceholder(entreno.duracion_min)}</Text>
             </View>
           )}
           {!!entreno.tss_plan && (
             <View style={styles.misionMetaItem}>
               <Text style={styles.misionMetaLabel}>TSS:</Text>
               <Text style={styles.misionMetaValue}> {entreno.tss_plan}</Text>
+            </View>
+          )}
+          {!!entreno.hora && (
+            <View style={styles.misionMetaItem}>
+              <Text style={styles.misionMetaLabel}>Hora:</Text>
+              <Text style={styles.misionMetaValue}> {entreno.hora}</Text>
+            </View>
+          )}
+          {!!entreno.punto_encuentro && (
+            <View style={styles.misionMetaItem}>
+              <Text style={styles.misionMetaLabel}>Lugar:</Text>
+              <Text style={styles.misionMetaValue}> {entreno.punto_encuentro}</Text>
             </View>
           )}
         </View>
@@ -203,13 +295,13 @@ function MisionHoy({ entreno, styles }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Countdown Carrera
+// Countdown Carrera — Atajo interactivo hacia detalles
 // ─────────────────────────────────────────────────────────────
-function CountdownCard({ proximaCarrera, diasParaCarrera, styles }) {
+function CountdownCard({ proximaCarrera, diasParaCarrera, onPress, styles }) {
   if (!proximaCarrera) return null;
 
-  return (
-    <View style={styles.countdownCard}>
+  const content = (
+    <>
       <Trophy color="#00F0FF" size={22} />
       <View style={styles.countdownLeft}>
         <Text style={styles.countdownSmallLabel}>PRÓXIMA CARRERA</Text>
@@ -223,57 +315,88 @@ function CountdownCard({ proximaCarrera, diasParaCarrera, styles }) {
         <Text style={styles.countdownNumber}>{diasParaCarrera}</Text>
         <Text style={styles.countdownUnit}>días</Text>
       </View>
-    </View>
+    </>
+  );
+
+  if (!onPress) {
+    return <View style={styles.countdownCard}>{content}</View>;
+  }
+
+  return (
+    <TouchableOpacity style={styles.countdownCard} onPress={onPress} activeOpacity={0.8}>
+      {content}
+    </TouchableOpacity>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
-// Quick Actions
+// TelemetryCarousel — TSS + Estado Físico en carrusel horizontal
 // ─────────────────────────────────────────────────────────────
-function QuickActions({ onReportInjury, onOpenXerpa, onSyncData, styles }) {
-  return (
-    <View style={styles.quickActionsSection}>
-      <Text style={styles.quickActionsTitle}>ACCIONES RÁPIDAS</Text>
-      <View style={styles.quickActionsRow}>
-        <TouchableOpacity style={[styles.quickActionCard, styles.quickActionCardDanger]} onPress={onReportInjury}>
-          <AlertTriangle color="#ff5252" size={22} />
-          <Text style={[styles.quickActionText, styles.quickActionTextDanger]}>Me lesioné</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.quickActionCard, styles.quickActionCardAI]} onPress={onOpenXerpa}>
-          <Bot color="#00F0FF" size={22} />
-          <Text style={[styles.quickActionText, styles.quickActionTextAI]}>PXERPA</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.quickActionCard, styles.quickActionCardSync]} onPress={onSyncData}>
-          <RefreshCw color="#39FF14" size={22} />
-          <Text style={[styles.quickActionText, styles.quickActionTextSync]}>Sincronizar</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
+const CAROUSEL_CARD_WIDTH = 280;
+const CAROUSEL_CARD_HEIGHT = 160;
+const CAROUSEL_CARD_MARGIN = 16;
+const TSS_RING_SIZE = 88;
 
-// ─────────────────────────────────────────────────────────────
-// Quick Metrics (CTL / ATL / TSB)
-// ─────────────────────────────────────────────────────────────
-function QuickMetrics({ ctl, atl, tsb, styles }) {
+function TelemetryCarousel({ ctl, atl, tsb, tssSemanal, tssPlaneado, tssProgress, styles }) {
+  const snapInterval = CAROUSEL_CARD_WIDTH + CAROUSEL_CARD_MARGIN;
+
   return (
-    <View style={styles.quickMetricsRow}>
-      <View style={styles.metricCard}>
-        <Text style={[styles.metricValue, styles.metricValueCtl]}>{ctl ?? '—'}</Text>
-        <Text style={styles.metricLabel}>CTL</Text>
-        <Text style={styles.metricSublabel}>Forma</Text>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      snapToInterval={snapInterval}
+      snapToAlignment="start"
+      decelerationRate="fast"
+      contentContainerStyle={styles.telemetryCarouselContent}
+    >
+      {/* Tarjeta 1 — TSS Semanal */}
+      <View style={styles.telemetryCard}>
+        <Text style={styles.telemetryCardLabel}>TSS SEMANAL</Text>
+        <View style={styles.telemetryTssRow}>
+          <View style={styles.telemetryTssRingWrap}>
+            <CircularProgress
+              progress={tssProgress}
+              size={TSS_RING_SIZE}
+              strokeWidth={7}
+              color="#00D2FF"
+              showLabel
+            />
+          </View>
+          <View style={styles.telemetryTssNumbers}>
+            <Text style={styles.telemetryTssActual}>{tssSemanal ?? '—'}</Text>
+            <Text style={styles.telemetryTssDivider}>/</Text>
+            <Text style={styles.telemetryTssPlanned}>{tssPlaneado > 0 ? tssPlaneado : '—'} plan</Text>
+          </View>
+        </View>
+        <XerpaProgress
+          progress={tssProgress}
+          color="#00D2FF"
+          style={styles.telemetryProgressWrap}
+        />
       </View>
-      <View style={styles.metricCard}>
-        <Text style={[styles.metricValue, styles.metricValueAtl]}>{atl ?? '—'}</Text>
-        <Text style={styles.metricLabel}>ATL</Text>
-        <Text style={styles.metricSublabel}>Fatiga</Text>
+
+      {/* Tarjeta 2 — Estado Físico (CTL / ATL / TSB) */}
+      <View style={[styles.telemetryCard, { marginRight: 0 }]}>
+        <Text style={styles.telemetryCardLabel}>ESTADO FÍSICO</Text>
+        <View style={styles.telemetryMetricsGrid}>
+          <View style={styles.telemetryMetricItem}>
+            <Text style={[styles.telemetryMetricValue, styles.telemetryMetricCtl]}>{ctl ?? '—'}</Text>
+            <Text style={styles.telemetryMetricLabel}>CTL</Text>
+            <Text style={styles.telemetryMetricSublabel}>Forma</Text>
+          </View>
+          <View style={styles.telemetryMetricItem}>
+            <Text style={[styles.telemetryMetricValue, styles.telemetryMetricAtl]}>{atl ?? '—'}</Text>
+            <Text style={styles.telemetryMetricLabel}>ATL</Text>
+            <Text style={styles.telemetryMetricSublabel}>Fatiga</Text>
+          </View>
+          <View style={styles.telemetryMetricItem}>
+            <Text style={[styles.telemetryMetricValue, styles.telemetryMetricTsb]}>{tsb ?? '—'}</Text>
+            <Text style={styles.telemetryMetricLabel}>TSB</Text>
+            <Text style={styles.telemetryMetricSublabel}>Balance</Text>
+          </View>
+        </View>
       </View>
-      <View style={[styles.metricCard, styles.metricCardTsb]}>
-        <Text style={[styles.metricValue, styles.metricValueTsb]}>{tsb ?? '—'}</Text>
-        <Text style={styles.metricLabel}>TSB</Text>
-        <Text style={styles.metricSublabel}>Balance</Text>
-      </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -310,19 +433,14 @@ function RpeSliderSection({ rpeValue, onRpeChange, rpeLabel, rpeColor, onSave, l
         maximumTrackTintColor="#222"
         thumbTintColor={rpeColor}
       />
-      <TouchableOpacity style={styles.rpeSaveButton} onPress={onSave} disabled={loading} activeOpacity={0.8}>
-        <LinearGradient
-          colors={['#00F0FF', '#39FF14']}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={styles.rpeSaveButtonGradient}
-        >
-          {loading
-            ? <ActivityIndicator color="#121212" size="small" />
-            : <Text style={styles.rpeSaveButtonText}>Guardar Entrenamiento</Text>
-          }
-        </LinearGradient>
-      </TouchableOpacity>
+      <Button
+        title="Guardar Entrenamiento"
+        variant="primary"
+        onPress={onSave}
+        loading={loading}
+        disabled={loading}
+        style={styles.rpeSaveButton}
+      />
     </View>
   );
 }
@@ -349,6 +467,7 @@ export function DashboardView({
   tssSemanal,
   tssPlaneadoSemanal,
   tssProgressPct,
+  readinessPct,
   entrenoHoy,
   hasReportedToday,
   rpeValue,
@@ -360,12 +479,31 @@ export function DashboardView({
   motivationalMessage,
   proximaCarrera,
   diasParaCarrera,
-  onReportInjury,
   onOpenXerpa,
   onSyncData,
+  enrollToRace,
+  unenrollFromRace,
+  city,
+  climaData,
+  locationPermission,
+  loadingLocation,
+  onRequestLocation,
   styles,
 }) {
   const rpeColor = getRpeColor(rpeValue);
+  const { scrollHandler, HEADER_MAX_HEIGHT, interpolations, insets } = useCollapsibleHeader();
+  const greeting = getGreeting();
+  const [detailCarrera, setDetailCarrera] = useState(null);
+
+  function handleOpenRaceDetail(carrera) {
+    if (!carrera) return;
+    const normalized = carrera.carrera_id != null
+      ? { ...carrera, id: carrera.carrera_id }
+      : carrera;
+    setDetailCarrera(normalized);
+  }
+
+  const isEnrolled = detailCarrera != null;
 
   if (loading) {
     return (
@@ -378,48 +516,51 @@ export function DashboardView({
   }
 
   return (
-    <ScreenWrapper style={styles.safeContainer}>
-      <ScrollView
+    <ScreenWrapper style={styles.safeContainer} edges={['left', 'right']}>
+      <CollapsibleHeader
+        bigTitleRow1={greeting}
+        bigTitleRow2={nombre || 'Atleta'}
+        bigSubtitleNeon={motivationalMessage}
+        smallTitle={nombre ? nombre : 'Dashboard'}
+        rightAction={
+          <AnimatedActionButton
+            label="Sync"
+            icon={<RefreshCw color="#00D2FF" size={20} strokeWidth={2.5} />}
+            onPress={onSyncData}
+            interpolations={interpolations}
+          />
+        }
+        interpolations={interpolations}
+        insets={insets}
+      />
+      <Animated.ScrollView
+        bounces={false}
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: HEADER_MAX_HEIGHT },
+        ]}
         showsVerticalScrollIndicator={false}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
       >
-        {/* 1 · Header */}
-        <HeaderSection nombre={nombre} motivationalMessage={motivationalMessage} styles={styles} />
-
-        {/* 2 · Weather/Geo */}
-        <WeatherBanner styles={styles} />
-
-        {/* 3 · TSS Progress Ring */}
-        <TSSSection
-          tssSemanal={tssSemanal}
-          tssPlaneadoSemanal={tssPlaneadoSemanal}
-          tssProgressPct={tssProgressPct}
+        {/* 0 · HeroCoachCard */}
+        <HeroCoachCard
+          nombre={nombre}
+          readinessPct={readinessPct ?? 75}
+          onPressXerpa={onOpenXerpa}
+          city={city}
+          climaData={climaData}
+          locationPermission={locationPermission}
+          loadingLocation={loadingLocation}
+          onRequestLocation={onRequestLocation}
           styles={styles}
         />
 
-        {/* 4 · Misión de Hoy */}
+        {/* 1 · Misión de Hoy */}
         <MisionHoy entreno={entrenoHoy} styles={styles} />
 
-        {/* 5 · Countdown */}
-        <CountdownCard
-          proximaCarrera={proximaCarrera}
-          diasParaCarrera={diasParaCarrera}
-          styles={styles}
-        />
-
-        {/* 6 · Quick Actions */}
-        <QuickActions
-          onReportInjury={onReportInjury}
-          onOpenXerpa={onOpenXerpa}
-          onSyncData={onSyncData}
-          styles={styles}
-        />
-
-        {/* CTL / ATL / TSB */}
-        <QuickMetrics ctl={ctl} atl={atl} tsb={tsb} styles={styles} />
-
-        {/* RPE Slider / Success */}
+        {/* 2 · RPE Slider / Success */}
         {!hasReportedToday ? (
           <RpeSliderSection
             rpeValue={rpeValue}
@@ -433,7 +574,37 @@ export function DashboardView({
         ) : (
           <RpeSuccessMessage styles={styles} />
         )}
-      </ScrollView>
+
+        {/* 3 · CountdownCard — Acceso directo a detalles de la carrera */}
+        <CountdownCard
+          proximaCarrera={proximaCarrera}
+          diasParaCarrera={diasParaCarrera}
+          onPress={() => handleOpenRaceDetail(proximaCarrera)}
+          styles={styles}
+        />
+
+        {/* 4 · TelemetryCarousel — CTL/ATL/TSB + TSS horizontal */}
+        <TelemetryCarousel
+          ctl={ctl}
+          atl={atl}
+          tsb={tsb}
+          tssSemanal={tssSemanal}
+          tssPlaneado={tssPlaneadoSemanal}
+          tssProgress={tssProgressPct}
+          styles={styles}
+        />
+      </Animated.ScrollView>
+
+      <RaceDetailSheet
+        visible={!!detailCarrera}
+        carrera={detailCarrera}
+        isEnrolled={isEnrolled}
+        ctl={ctl}
+        onClose={() => setDetailCarrera(null)}
+        onEnroll={enrollToRace}
+        onUnenroll={unenrollFromRace}
+        styles={raceCalendarStyles}
+      />
     </ScreenWrapper>
   );
 }

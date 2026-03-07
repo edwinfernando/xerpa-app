@@ -5,6 +5,7 @@ import { perfilStyles } from './PerfilStyles';
 
 export default function PerfilScreen({ user }) {
   const {
+    profileData,
     loading,
     isSavingPerfil,
     nombre,
@@ -12,12 +13,43 @@ export default function PerfilScreen({ user }) {
     nombreError,
     rol,
     setRol,
+    edad,
+    setEdad,
+    tallaCm,
+    setTallaCm,
+    pesoKg,
+    setPesoKg,
+    modalidad,
+    setModalidad,
+    categoria,
+    setCategoria,
     email,
-    handleGuardar,
+    handleGuardarBiometria,
+    handleGuardarPreferencias,
+    handleInsertContacto,
+    handleUpdateContacto,
+    handleDeleteContacto,
     handleLogout,
-    handleVincularStrava,
     handleVincularIntervalos,
-    // Password change
+    handlePlatformPress,
+    codigoVinculacion,
+    handleCopyCodigo,
+    handleShareCodigo,
+    showIntervalosSheet,
+    idExterno,
+    setIdExterno,
+    apiKeyIntervalos,
+    setApiKeyIntervalos,
+    intervalosError,
+    isSavingIntervalos,
+    handleCerrarIntervalosSheet,
+    handleGuardarIntervalos,
+    codigoIngresado,
+    handleCodigoIngresadoChange,
+    handleVincularConCodigo,
+    vincularLoading,
+    vincularError,
+    relacionesActivas,
     showPasswordSheet,
     newPassword,
     setNewPassword,
@@ -28,23 +60,63 @@ export default function PerfilScreen({ user }) {
     handleAbrirCambioContrasena,
     handleCerrarCambioContrasena,
     handleGuardarContrasena,
+    refreshUserData,
+    showBiometriaSheet,
+    showNotificacionesSheet,
+    handleOpenBiometriaSheet,
+    handleCloseBiometriaSheet,
+    handleOpenNotificacionesSheet,
+    handleCloseNotificacionesSheet,
+    showToast,
   } = usePerfil(user);
 
   return (
     <PerfilView
+      profileData={profileData}
+      loading={loading}
       nombre={nombre}
       setNombre={setNombre}
       nombreError={nombreError}
       rol={rol}
       setRol={setRol}
+      edad={edad}
+      setEdad={setEdad}
+      tallaCm={tallaCm}
+      setTallaCm={setTallaCm}
+      pesoKg={pesoKg}
+      setPesoKg={setPesoKg}
+      modalidad={modalidad}
+      setModalidad={setModalidad}
+      categoria={categoria}
+      setCategoria={setCategoria}
       email={email}
-      loading={loading}
       isSavingPerfil={isSavingPerfil}
-      handleGuardar={handleGuardar}
+      handleGuardarBiometria={handleGuardarBiometria}
+      handleGuardarPreferencias={handleGuardarPreferencias}
+      handleInsertContacto={handleInsertContacto}
+      handleUpdateContacto={handleUpdateContacto}
+      handleDeleteContacto={handleDeleteContacto}
       handleLogout={handleLogout}
-      handleVincularStrava={handleVincularStrava}
       handleVincularIntervalos={handleVincularIntervalos}
-      // Password change
+      handlePlatformPress={handlePlatformPress}
+    codigoVinculacion={codigoVinculacion}
+    handleCopyCodigo={handleCopyCodigo}
+    handleShareCodigo={handleShareCodigo}
+      showIntervalosSheet={showIntervalosSheet}
+      idExterno={idExterno}
+      setIdExterno={setIdExterno}
+      apiKeyIntervalos={apiKeyIntervalos}
+      setApiKeyIntervalos={setApiKeyIntervalos}
+      intervalosError={intervalosError}
+      isSavingIntervalos={isSavingIntervalos}
+      handleCerrarIntervalosSheet={handleCerrarIntervalosSheet}
+      handleGuardarIntervalos={handleGuardarIntervalos}
+      codigoIngresado={codigoIngresado}
+      handleCodigoIngresadoChange={handleCodigoIngresadoChange}
+      handleVincularConCodigo={handleVincularConCodigo}
+      vincularLoading={vincularLoading}
+      vincularError={vincularError}
+      relacionesActivas={relacionesActivas}
       showPasswordSheet={showPasswordSheet}
       newPassword={newPassword}
       setNewPassword={setNewPassword}
@@ -55,6 +127,14 @@ export default function PerfilScreen({ user }) {
       handleAbrirCambioContrasena={handleAbrirCambioContrasena}
       handleCerrarCambioContrasena={handleCerrarCambioContrasena}
       handleGuardarContrasena={handleGuardarContrasena}
+      refreshUserData={refreshUserData}
+      showBiometriaSheet={showBiometriaSheet}
+      showNotificacionesSheet={showNotificacionesSheet}
+      handleOpenBiometriaSheet={handleOpenBiometriaSheet}
+      handleCloseBiometriaSheet={handleCloseBiometriaSheet}
+      handleOpenNotificacionesSheet={handleOpenNotificacionesSheet}
+      handleCloseNotificacionesSheet={handleCloseNotificacionesSheet}
+      showToast={showToast}
       styles={perfilStyles}
     />
   );

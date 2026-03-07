@@ -7,6 +7,7 @@ import {
   Animated,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import { LayoutDashboard, Calendar, User, Trophy } from 'lucide-react-native';
@@ -147,8 +148,7 @@ function XerpaTabButton({ onPress, children, style }) {
 
   function handlePress() {
     if (isTimerActive) {
-      // Lleva al usuario a Plan para que pueda pulsar Stop
-      navigation.navigate('Plan');
+      navigation.navigate('WorkoutActive');
     } else {
       onPress?.();
     }
@@ -168,27 +168,34 @@ function XerpaTabButton({ onPress, children, style }) {
 // ─────────────────────────────────────────────────────────────
 // Navigator
 // ─────────────────────────────────────────────────────────────
-export function MainTabNavigator({ user }) {
+const TAB_BAR_BASE_HEIGHT = 60;
+
+export function MainTabNavigator({ user, initialTab, onboardingParams, onOnboardingConsumed }) {
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = TAB_BAR_BASE_HEIGHT + insets.bottom;
+  const tabBarPaddingBottom = insets.bottom > 0 ? insets.bottom : 16;
+
   return (
     <Tab.Navigator
+      initialRouteName={initialTab || 'Dashboard'}
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#121212',
-          borderTopColor: '#222',
-          borderTopWidth: 1,
-          height: 56,
-          paddingBottom: 0,
+          backgroundColor: 'rgba(30, 30, 30, 0.9)',
+          borderTopColor: 'transparent',
+          borderTopWidth: 0,
+          height: tabBarHeight,
+          paddingBottom: tabBarPaddingBottom,
+          paddingTop: 8,
         },
         tabBarActiveTintColor: '#00F0FF',
-        tabBarInactiveTintColor: '#666',
-        tabBarShowLabel: true,
+        tabBarInactiveTintColor: '#8E8E93',
+        tabBarShowLabel: false,
       }}
     >
       <Tab.Screen
         name="Dashboard"
         options={{
-          tabBarLabel: 'Dashboard',
           tabBarIcon: ({ color, size }) => <LayoutDashboard color={color} size={size} />,
         }}
       >
@@ -198,7 +205,6 @@ export function MainTabNavigator({ user }) {
       <Tab.Screen
         name="Plan"
         options={{
-          tabBarLabel: 'Plan',
           tabBarIcon: ({ color, size }) => <Calendar color={color} size={size} />,
         }}
       >
@@ -213,13 +219,19 @@ export function MainTabNavigator({ user }) {
           tabBarButton: (props) => <XerpaTabButton {...props} />,
         }}
       >
-        {() => <XerpaAIScreen user={user} />}
+        {({ route }) => (
+        <XerpaAIScreen
+          user={user}
+          route={route}
+          onboardingParams={onboardingParams}
+          onOnboardingConsumed={onOnboardingConsumed}
+        />
+      )}
       </Tab.Screen>
 
       <Tab.Screen
         name="Carreras"
         options={{
-          tabBarLabel: 'Carreras',
           tabBarIcon: ({ color, size }) => <Trophy color={color} size={size} />,
         }}
       >
@@ -229,7 +241,6 @@ export function MainTabNavigator({ user }) {
       <Tab.Screen
         name="Perfil"
         options={{
-          tabBarLabel: 'Perfil',
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
         }}
       >

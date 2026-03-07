@@ -1,32 +1,61 @@
 import { StyleSheet } from 'react-native';
-import { theme } from '../../styles/theme';
+import { theme } from '../../theme/theme';
+
+const TOUCH_MIN = theme.TOUCH_TARGET_MIN;
 
 export const forgotPasswordStyles = StyleSheet.create({
   safeContainer: {
     flex: 1,
   },
-  container: {
-    flex: 1,
+  headerBar: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: theme.SCREEN_PADDING_HORIZONTAL,
+    paddingVertical: theme.spacing.sm,
+    minHeight: 48,
+  },
+  backButtonTouch: {
+    minWidth: TOUCH_MIN,
+    minHeight: TOUCH_MIN,
     justifyContent: 'center',
-    paddingHorizontal: theme.spacing.screenPadding,
+    alignItems: 'center',
+    marginLeft: -8,
+  },
+  mainContainer: {
+    flex: 1,
+  },
+  keyboardAvoid: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: theme.SCREEN_PADDING_HORIZONTAL,
+    paddingVertical: theme.spacing.xl,
+    paddingBottom: 80,
+  },
+  formContent: {
+    alignItems: 'center',
+    width: '100%',
   },
   iconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 18,
-    backgroundColor: '#1E1E1E',
+    width: 64,
+    height: 64,
+    borderRadius: theme.borderRadius.lg,
+    backgroundColor: theme.colors.surfaceInput,
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 28,
+    marginBottom: 24,
   },
   iconText: {
-    fontSize: 32,
+    fontSize: 28,
   },
   title: {
-    color: '#fff',
+    color: theme.colors.text,
     fontSize: 28,
     fontWeight: '800',
     textAlign: 'center',
@@ -34,61 +63,61 @@ export const forgotPasswordStyles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   description: {
-    color: '#888888',
-    fontSize: 15,
+    color: theme.colors.textMuted,
+    fontSize: 14,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 40,
     paddingHorizontal: 8,
+    fontWeight: '400',
   },
   inputWrapper: {
-    width: '90%',
-    marginBottom: 24,
+    width: '100%',
+    marginBottom: 28,
   },
   input: {
     width: '100%',
-    backgroundColor: '#1E1E1E',
-    color: '#fff',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: theme.colors.surfaceInput,
+    color: theme.colors.text,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
     borderWidth: 1,
-    borderColor: '#333333',
-    fontSize: 16,
+    borderColor: theme.colors.border,
+    fontSize: theme.INPUT_FONT_SIZE_MIN,
   },
   inputError: {
-    borderColor: '#FF4444',
+    borderColor: theme.colors.danger,
   },
   helperText: {
-    color: '#FF4444',
+    color: theme.colors.danger,
     fontSize: 12,
     marginTop: 6,
     marginLeft: 4,
   },
-  buttonGradient: {
-    width: '90%',
-    borderRadius: 12,
-    marginBottom: 20,
+  primaryButton: {
+    width: '100%',
+    height: theme.BUTTON_HEIGHT,
   },
-  button: {
-    padding: 16,
+  footerFixed: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    borderRadius: 12,
+    paddingBottom: 20,
+    backgroundColor: theme.colors.background,
   },
-  buttonText: {
-    color: '#121212',
-    fontWeight: 'bold',
-    fontSize: 16,
-    letterSpacing: 0.5,
+  bottomLinkTouch: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 10,
   },
-  backButton: {
-    paddingVertical: 8,
+  bottomLinkText: {
+    color: theme.colors.textMuted,
+    fontSize: 14,
   },
-  backButtonText: {
-    color: '#888888',
-    fontSize: 15,
-  },
-  backButtonHighlight: {
-    color: '#00F0FF',
+  bottomLinkHighlight: {
+    color: theme.colors.linkHighlight,
     fontWeight: '600',
   },
 });

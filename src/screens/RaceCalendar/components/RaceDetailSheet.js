@@ -16,8 +16,10 @@ import {
   Alert,
   Image,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import Modal from 'react-native-modal';
+import * as Clipboard from 'expo-clipboard';
 import { Button } from '../../../components/ui/Button';
 import {
   Calendar,
@@ -32,7 +34,8 @@ import {
 } from 'lucide-react-native';
 import { formatDateRange } from '../../../utils/formatDateRange';
 import { showXerpaError } from '../../../utils/ErrorHandler';
-import { computeXerpaReadinessPct } from './SmartRaceCard';
+import { computeXerpaReadinessPct } from '../../../utils/raceReadiness';
+import { useModalSwipeScroll } from '../../../hooks/useModalSwipeScroll';
 
 function DificultadBadge({ nivel, styles }) {
   const n = nivel != null ? Number(nivel) : null;
@@ -116,37 +119,27 @@ export function RaceDetailSheet({
   onUnenroll,
   styles,
 }) {
+  const { height: screenHeight } = useWindowDimensions();
   const [loading, setLoading] = React.useState(false);
   const [showConfirmUnenroll, setShowConfirmUnenroll] = React.useState(false);
-  const [scrollOffsetY, setScrollOffsetY] = React.useState(0);
-  const scrollViewRef = React.useRef(null);
-  const scrollOffsetRef = React.useRef(0);
+  const [headerHeight, setHeaderHeight] = React.useState(0);
+  const [footerHeight, setFooterHeight] = React.useState(0);
+  const [contentHeight, setContentHeight] = React.useState(0);
+  const SWIPE_HEADER_HEIGHT = 110;
+  const {
+    scrollViewRef,
+    scrollOffsetY,
+    propagateSwipe,
+    scrollTo,
+    onScroll,
+  } = useModalSwipeScroll(SWIPE_HEADER_HEIGHT, visible);
 
   const SHEET_BG = '#1A1A1A';
+  const MAX_SHEET_HEIGHT = Math.floor(screenHeight * 0.9);
+  const MIN_SHEET_HEIGHT = 340;
 
   const handleRequestClose = () =>
     showConfirmUnenroll ? setShowConfirmUnenroll(false) : onClose();
-
-  React.useEffect(() => {
-    if (visible) {
-      setScrollOffsetY(0);
-      scrollOffsetRef.current = 0;
-    }
-  }, [visible]);
-
-  const SWIPE_HEADER_HEIGHT = 110;
-  const propagateSwipe = React.useCallback((evt) => {
-    const locationY = evt?.nativeEvent?.locationY ?? 0;
-    return locationY > SWIPE_HEADER_HEIGHT;
-  }, []);
-
-  const scrollTo = React.useCallback((offset) => {
-    if (offset && typeof offset.y === 'number') {
-      const currentY = scrollOffsetRef.current;
-      const newY = Math.max(0, currentY + offset.y);
-      scrollViewRef.current?.scrollTo({ y: newY, animated: false });
-    }
-  }, []);
 
   const imagenUrl = carrera?.imagen_url?.trim();
 
@@ -162,8 +155,19 @@ export function RaceDetailSheet({
   const lat = carrera.latitud != null ? Number(carrera.latitud) : null;
   const lng = carrera.longitud != null ? Number(carrera.longitud) : null;
   const hasLocation = lat != null && lng != null;
+  const locationLabel = [circuitoNombre, carrera.ciudad, carrera.pais]
+    .filter(Boolean)
+    .join(', ');
+  const hasAnyLocationInfo = !!locationLabel || hasLocation;
   const tssEstimado = carrera.tss_estimado != null ? Number(carrera.tss_estimado) : null;
   const readinessPct = computeXerpaReadinessPct(ctl, tssEstimado);
+  const maxBodyHeight = Math.max(180, MAX_SHEET_HEIGHT - headerHeight - footerHeight);
+  const shouldScroll = contentHeight > maxBodyHeight;
+  const desiredSheetHeight = headerHeight + footerHeight + (shouldScroll ? maxBodyHeight : contentHeight);
+  const computedSheetHeight = Math.max(
+    MIN_SHEET_HEIGHT,
+    Math.min(MAX_SHEET_HEIGHT, desiredSheetHeight || MIN_SHEET_HEIGHT)
+  );
 
   function getMapsUrl() {
     if (!hasLocation) return null;
@@ -183,6 +187,13 @@ export function RaceDetailSheet({
         `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
       );
     }
+  }
+
+  async function handleCopyCoords() {
+    if (!hasLocation) return;
+    const coords = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    await Clipboard.setStringAsync(coords);
+    Alert.alert('Coordenadas copiadas', coords);
   }
 
   async function handleInscribirme() {
@@ -238,36 +249,55 @@ export function RaceDetailSheet({
     >
       <View style={styles.sheetOverlay}>
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={handleRequestClose} />
-        <View style={[styles.sheetContainer, { backgroundColor: SHEET_BG }]}>
-          <View style={[styles.sheetHandle, { backgroundColor: '#E5E5EA' }]} />
-          <View style={styles.sheetTitleRow}>
-            <Trophy color="#00F0FF" size={20} />
-            <Text style={styles.sheetTitle} numberOfLines={2}>
-              {carrera.nombre ?? 'Carrera'}
+        <View
+          style={[
+            styles.sheetContainer,
+            {
+              backgroundColor: SHEET_BG,
+              maxHeight: MAX_SHEET_HEIGHT,
+              minHeight: MIN_SHEET_HEIGHT,
+              height: computedSheetHeight,
+            },
+          ]}
+        >
+          <View
+            onLayout={(e) => {
+              const h = Math.ceil(e.nativeEvent.layout.height || 0);
+              if (!h) return;
+              setHeaderHeight((prev) => (Math.abs(prev - h) >= 2 ? h : prev));
+            }}
+          >
+            <View style={[styles.sheetHandle, { backgroundColor: '#E5E5EA' }]} />
+            <View style={styles.sheetTitleRow}>
+              <Trophy color="#00F0FF" size={20} />
+              <Text style={styles.sheetTitle} numberOfLines={2}>
+                {carrera.nombre ?? 'Carrera'}
+              </Text>
+            </View>
+            <Text style={styles.sheetSubtitle}>
+              {circuitoNombre || carrera.ciudad
+                ? [circuitoNombre, carrera.ciudad].filter(Boolean).join(' · ')
+                : 'Ficha técnica de la carrera'}
             </Text>
           </View>
-          <Text style={styles.sheetSubtitle}>
-            {circuitoNombre || carrera.ciudad
-              ? [circuitoNombre, carrera.ciudad].filter(Boolean).join(' · ')
-              : 'Ficha técnica de la carrera'}
-          </Text>
 
           <ScrollView
             ref={scrollViewRef}
-            style={{ flex: 1 }}
+            style={{ maxHeight: maxBodyHeight }}
             showsVerticalScrollIndicator={false}
-            bounces={false}
+            bounces={shouldScroll}
             decelerationRate="fast"
             keyboardShouldPersistTaps="handled"
             overScrollMode="never"
             contentContainerStyle={styles.detailScroll}
-            onScroll={(e) => {
-              const currentOffset = e.nativeEvent.contentOffset.y;
-              const y = currentOffset < 0 ? 0 : currentOffset;
-              setScrollOffsetY(y);
-              scrollOffsetRef.current = y;
-            }}
+            scrollEnabled={shouldScroll}
+            onScroll={onScroll}
             scrollEventThrottle={16}
+            onContentSizeChange={(_, h) => {
+              const next = Math.ceil(h || 0);
+              if (!next) return;
+              setContentHeight((prev) => (Math.abs(next - prev) >= 2 ? next : prev));
+            }}
           >
             {/* Hero: imagen a ancho completo, circuito superpuesto */}
             {!!imagenUrl && (
@@ -351,25 +381,41 @@ export function RaceDetailSheet({
               </Text>
             </View>
 
+            {hasAnyLocationInfo && (
             <View style={styles.detailSection}>
               <View style={styles.detailSectionTitleRow}>
                 <MapPin color="#00F0FF" size={14} />
-                <Text style={styles.detailSectionTitle}>Mapa</Text>
+                <Text style={styles.detailSectionTitle}>Ubicación</Text>
               </View>
-              <View style={styles.mapPlaceholder}>
-              <MapPin color="#555" size={28} />
-              <Text style={styles.mapPlaceholderText}>Mapa de la ruta</Text>
-              {hasLocation && (
+              <Text style={styles.detailSectionBody}>
+                {locationLabel || 'Ubicación general de la carrera'}
+              </Text>
+              {hasLocation ? (
+                <>
                 <TouchableOpacity
-                  style={styles.mapPlaceholderBtn}
+                  onPress={handleCopyCoords}
+                  activeOpacity={0.8}
+                  style={{ marginTop: 6, alignSelf: 'flex-start' }}
+                >
+                  <Text style={[styles.detailSectionBody, { color: '#8E8E93' }]}>
+                    {`${lat.toFixed(6)}, ${lng.toFixed(6)} · tocar para copiar`}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.detailUrlLink, { marginTop: 10 }]}
                   onPress={handleOpenLocation}
                 >
-                  <Text style={styles.mapPlaceholderBtnText}>Abrir en Maps</Text>
+                  <Text style={styles.detailUrlLinkText}>Ver en mapa</Text>
                   <ExternalLink color="#00F0FF" size={14} />
                 </TouchableOpacity>
+                </>
+              ) : (
+                <Text style={[styles.detailSectionBody, { marginTop: 10, color: '#8E8E93' }]}>
+                  Esta carrera no tiene coordenadas exactas todavía.
+                </Text>
               )}
-              </View>
             </View>
+            )}
 
             <View style={styles.detailSection}>
               <View style={styles.detailSectionTitleRow}>
@@ -416,7 +462,14 @@ export function RaceDetailSheet({
           </ScrollView>
 
           {/* Sticky Footer — Acciones */}
-          <View style={styles.detailStickyFooter}>
+          <View
+            style={styles.detailStickyFooter}
+            onLayout={(e) => {
+              const h = Math.ceil(e.nativeEvent.layout.height || 0);
+              if (!h) return;
+              setFooterHeight((prev) => (Math.abs(prev - h) >= 2 ? h : prev));
+            }}
+          >
             {showConfirmUnenroll ? (
               <>
                 <Text style={styles.unenrollConfirmText}>

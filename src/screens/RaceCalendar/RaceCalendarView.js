@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -27,7 +27,6 @@ import { isPastRace } from '../../utils/raceReadiness';
 import { useToast } from '../../context/ToastContext';
 import { TABS } from './useRaceCalendar';
 import { SmartRaceCard } from './components/SmartRaceCard';
-import { AddRaceModal } from './components/AddRaceModal';
 import { EventFilters } from './components/EventFilters';
 import { FilterBottomSheet } from './components/FilterBottomSheet';
 import { RaceDetailSheet } from '../../components/races/RaceDetailSheet';
@@ -70,33 +69,30 @@ export function RaceCalendarView({
   globalLoading,
   globalError,
   ctl,
-  addRaceCatalogs,
-  addRaceCatalogsLoading,
   filters,
   setFilter,
   filterOptionsByTab,
   filteredRaces,
   filteredEventosXerpa,
   filteredRutasLocales,
-  addRace,
   deleteRace,
   updateRace,
   updateRaceByCarreraId,
   fetchRaceCategories,
-  fetchAddRaceCatalogs,
   fetchGlobalRaces,
   enrollToRace,
   unenrollFromRace,
+  onOpenAddRace,
   styles,
 }) {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState(TABS.MI_CALENDARIO);
-  const [modalVisible, setModalVisible] = useState(false);
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
   const [detailCarrera, setDetailCarrera] = useState(null);
   const [detailCategories, setDetailCategories] = useState([]);
   const [detailCategoriesLoading, setDetailCategoriesLoading] = useState(false);
   const [selectedPastRace, setSelectedPastRace] = useState(null);
+  const detailFetchSeqRef = useRef(0);
 
   useEffect(() => {
     if (activeTab === TABS.EVENTOS_XERPA || activeTab === TABS.RUTAS_LOCALES) {
@@ -108,41 +104,36 @@ export function RaceCalendarView({
     return races.some((r) => r.carrera_id === carreraId || r.id === carreraId);
   }
 
-  function handleOpenDetail(carrera) {
+  const handleOpenDetail = useCallback(async (carrera) => {
     const normalized = carrera.carrera_id != null
       ? { ...carrera, id: carrera.carrera_id }
       : carrera;
+    const seq = ++detailFetchSeqRef.current;
+    setDetailCategoriesLoading(true);
+    setDetailCategories([]);
     setDetailCarrera(normalized);
-  }
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadDetailCategories() {
-      if (!detailCarrera?.id || !fetchRaceCategories) {
-        setDetailCategories([]);
+    if (!normalized?.id || !fetchRaceCategories) {
+      setDetailCategoriesLoading(false);
+      return;
+    }
+
+    try {
+      const categories = await fetchRaceCategories(normalized);
+      if (detailFetchSeqRef.current !== seq) return;
+      setDetailCategories(Array.isArray(categories) ? categories : []);
+    } catch {
+      if (detailFetchSeqRef.current !== seq) return;
+      setDetailCategories([]);
+    } finally {
+      if (detailFetchSeqRef.current === seq) {
         setDetailCategoriesLoading(false);
-        return;
-      }
-      setDetailCategoriesLoading(true);
-      try {
-        const categories = await fetchRaceCategories(detailCarrera);
-        if (cancelled) return;
-        setDetailCategories(Array.isArray(categories) ? categories : []);
-      } catch {
-        if (cancelled) return;
-        setDetailCategories([]);
-      } finally {
-        if (!cancelled) setDetailCategoriesLoading(false);
       }
     }
-    loadDetailCategories();
-    return () => {
-      cancelled = true;
-    };
-  }, [detailCarrera, fetchRaceCategories]);
+  }, [fetchRaceCategories]);
 
   const { scrollHandler, HEADER_MAX_HEIGHT, interpolations, insets } = useCollapsibleHeader({ compact: true });
-  const isAnyModalVisible = modalVisible || filterSheetVisible || !!detailCarrera || !!selectedPastRace;
+  const isAnyModalVisible = filterSheetVisible || !!detailCarrera || !!selectedPastRace;
   useNavigationBarColor(isAnyModalVisible, '#131313', '#121212');
 
   function openPastRaceSheet(item) {
@@ -298,11 +289,21 @@ export function RaceCalendarView({
   }, [activeTab, loading, error, globalLoading, globalError, switchToEventosXerpa, switchToMiCalendario]);
 
   const FIXED_SEGMENTS_HEIGHT = 48;
-  const FIXED_SEARCH_HEIGHT = 88;
 
   const listHeaderComponent = useMemo(
     () => (
       <>
+        {showSearchBar && (
+          <View style={{ marginTop: Platform.OS === 'android' ? 20 : 16 }}>
+            <EventFilters
+              filters={filters}
+              setFilter={setFilter}
+              onOpenFilters={() => setFilterSheetVisible(true)}
+              hasActiveFilters={hasActiveFilters}
+              styles={styles}
+            />
+          </View>
+        )}
         {activeTab === TABS.MI_CALENDARIO && loading && (
           <RaceCardSkeletons count={4} styles={styles} />
         )}
@@ -334,6 +335,11 @@ export function RaceCalendarView({
     ),
     [
       activeTab,
+      showSearchBar,
+      filters,
+      setFilter,
+      setFilterSheetVisible,
+      hasActiveFilters,
       styles,
       loading,
       error,
@@ -352,7 +358,7 @@ export function RaceCalendarView({
           <AnimatedActionButton
             label="Añadir"
             icon={<Plus color="#00D2FF" size={20} strokeWidth={2.5} />}
-            onPress={() => setModalVisible(true)}
+            onPress={onOpenAddRace}
             interpolations={interpolations}
           />
         }
@@ -372,7 +378,7 @@ export function RaceCalendarView({
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingTop: HEADER_MAX_HEIGHT + FIXED_SEGMENTS_HEIGHT + (showSearchBar ? FIXED_SEARCH_HEIGHT : 0) },
+            { paddingTop: HEADER_MAX_HEIGHT + FIXED_SEGMENTS_HEIGHT },
             listData.length > 0 ? styles.list : undefined,
             listData.length === 0 ? styles.emptyListContent : undefined,
           ]}
@@ -384,7 +390,7 @@ export function RaceCalendarView({
           removeClippedSubviews={true}
         />
         </View>
-        {/* Segmentos + Search: encima del listado para que siempre sean visibles */}
+        {/* Segmentos fijos encima del listado */}
         <Animated.View
           style={[
             fixedBarStyles.fixedBar,
@@ -439,15 +445,6 @@ export function RaceCalendarView({
                 </TouchableOpacity>
               </ScrollView>
             </View>
-            {showSearchBar && (
-              <EventFilters
-                filters={filters}
-                setFilter={setFilter}
-                onOpenFilters={() => setFilterSheetVisible(true)}
-                hasActiveFilters={hasActiveFilters}
-                styles={styles}
-              />
-            )}
           </View>
         </Animated.View>
       </View>
@@ -474,17 +471,6 @@ export function RaceCalendarView({
         />
       )}
 
-      <AddRaceModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        onSave={addRace}
-        showToast={showToast}
-        catalogs={addRaceCatalogs}
-        catalogLoading={addRaceCatalogsLoading}
-        onLoadCatalogs={fetchAddRaceCatalogs}
-        styles={styles}
-      />
-
       <RaceDetailSheet
         visible={!!detailCarrera}
         carrera={detailCarrera}
@@ -493,6 +479,7 @@ export function RaceCalendarView({
         categoryLoading={detailCategoriesLoading}
         ctl={ctl}
         onClose={() => {
+          detailFetchSeqRef.current += 1;
           setDetailCarrera(null);
           setDetailCategories([]);
           setDetailCategoriesLoading(false);

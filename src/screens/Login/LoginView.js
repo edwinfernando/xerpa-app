@@ -2,15 +2,17 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
   Image,
+  ScrollView,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { ScreenWrapper } from '../../components/ScreenWrapper';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import { Ionicons } from '@expo/vector-icons';
 
 export function LoginView({
@@ -31,114 +33,115 @@ export function LoginView({
 
   return (
     <ScreenWrapper style={styles.safeContainer}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <Image
-          source={require('../../../assets/logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-
-        <Text style={styles.title}>XERPA</Text>
-        <Text style={styles.subtitle}>Tu guía invisible.</Text>
-
-        <View style={styles.inputContainer}>
-          {/* Email */}
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={[styles.input, emailError && styles.inputError]}
-              value={email}
-              onChangeText={handleSetEmail}
-              placeholder="Tu correo electrónico"
-              placeholderTextColor="#888888"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!loading}
-            />
-            {emailError ? (
-              <Text style={styles.helperText}>{emailError}</Text>
-            ) : null}
-          </View>
-
-          {/* Password con toggle de visibilidad */}
-          <View style={styles.inputWrapper}>
-            <View style={styles.passwordContainer}>
-              <TextInput
-                style={[styles.input, styles.passwordInput, passwordError && styles.inputError]}
-                value={password}
-                onChangeText={handleSetPassword}
-                placeholder="Contraseña"
-                placeholderTextColor="#888888"
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                editable={!loading}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword((prev) => !prev)}
-                disabled={loading}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-off' : 'eye'}
-                  size={22}
-                  color="#888888"
-                />
-              </TouchableOpacity>
-            </View>
-            {passwordError ? (
-              <Text style={styles.helperText}>{passwordError}</Text>
-            ) : null}
-          </View>
-        </View>
-
-        {/* Error global de autenticación (Supabase) */}
-        {globalAuthError ? (
-          <Text style={styles.globalAuthError}>{globalAuthError}</Text>
-        ) : null}
-
-        <LinearGradient
-          colors={['#00F0FF', '#39FF14']}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={styles.buttonGradient}
+      <View style={styles.mainContainer}>
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoid}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleLogin}
-            disabled={loading}
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            bounces={false}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            {loading ? (
-              <ActivityIndicator color="#121212" />
-            ) : (
-              <Text style={styles.buttonText}>ENTRAR A ENTRENAR</Text>
-            )}
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={styles.contentBlock}>
+                <Image
+                  source={require('../../../assets/logo.png')}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+
+                <Text style={styles.title}>XERPA</Text>
+                <Text style={styles.subtitle}>Tu guía invisible.</Text>
+
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputWrapper}>
+                    <Input
+                      value={email}
+                      onChangeText={handleSetEmail}
+                      placeholder="Tu correo electrónico"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      editable={!loading}
+                      error={!!emailError}
+                      errorText={emailError}
+                    />
+                  </View>
+
+                  <View style={styles.inputWrapper}>
+                    <Input
+                      value={password}
+                      onChangeText={handleSetPassword}
+                      placeholder="Contraseña"
+                      secureTextEntry={!showPassword}
+                      autoCapitalize="none"
+                      editable={!loading}
+                      error={!!passwordError}
+                      errorText={passwordError}
+                      rightAccessory={
+                        <TouchableOpacity
+                          style={styles.eyeButton}
+                          onPress={() => setShowPassword((prev) => !prev)}
+                          disabled={loading}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name={showPassword ? 'eye-off' : 'eye'}
+                            size={22}
+                            color="#888888"
+                          />
+                        </TouchableOpacity>
+                      }
+                    />
+                  </View>
+                </View>
+
+                {globalAuthError ? (
+                  <Text style={styles.globalAuthError}>{globalAuthError}</Text>
+                ) : null}
+
+                <View style={styles.buttonRow}>
+                  <Button
+                    title="ENTRAR A ENTRENAR"
+                    variant="primary"
+                    onPress={handleLogin}
+                    loading={loading}
+                    disabled={loading}
+                    style={styles.primaryButton}
+                  />
+
+                  <TouchableOpacity
+                    onPress={onNavigateForgotPassword}
+                    disabled={loading}
+                    activeOpacity={0.7}
+                    style={styles.forgotPasswordTouch}
+                  >
+                    <Text style={styles.forgotPasswordText}>¿Olvidé mi contraseña?</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </ScrollView>
+        </KeyboardAvoidingView>
+
+        <View style={styles.footerFixed}>
+          <TouchableOpacity
+            onPress={onNavigateSignUp}
+            disabled={loading}
+            activeOpacity={0.7}
+            style={styles.registerTouch}
+          >
+            <Text style={styles.registerText}>
+              ¿Nuevo aquí?{' '}
+              <Text style={styles.registerHighlight}>Regístrate</Text>
+            </Text>
           </TouchableOpacity>
-        </LinearGradient>
-
-        {/* "Olvidé mi contraseña" — justo debajo del botón, centrado */}
-        <TouchableOpacity
-          style={styles.forgotPasswordLink}
-          onPress={onNavigateForgotPassword}
-          disabled={loading}
-        >
-          <Text style={styles.forgotPasswordText}>¿Olvidé mi contraseña?</Text>
-        </TouchableOpacity>
-
-        {/* "¿Nuevo aquí? Regístrate" — anclado al fondo de la pantalla */}
-        <TouchableOpacity
-          style={styles.registerContainer}
-          onPress={onNavigateSignUp}
-          disabled={loading}
-        >
-          <Text style={styles.registerText}>
-            ¿Nuevo aquí?{'  '}
-            <Text style={styles.registerHighlight}>Regístrate</Text>
-          </Text>
-        </TouchableOpacity>
-      </KeyboardAvoidingView>
+        </View>
+      </View>
     </ScreenWrapper>
   );
 }

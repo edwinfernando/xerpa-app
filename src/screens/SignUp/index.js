@@ -4,12 +4,31 @@ import { SignUpView } from './SignUpView';
 import { signUpStyles } from './SignUpStyles';
 
 export default function SignUpScreen({ navigation }) {
-  const { loadingGoogle, loadingApple, handleGoogleSignIn, handleAppleSignIn } = useSignUp();
+  const {
+    email,
+    setEmail,
+    password,
+    setPassword,
+    loadingForm,
+    emailError,
+    passwordError,
+    globalAuthError,
+    handleCreateAccount,
+    handleGoogleSignIn,
+    handleAppleSignIn,
+  } = useSignUp();
 
   return (
     <SignUpView
-      loadingGoogle={loadingGoogle}
-      loadingApple={loadingApple}
+      email={email}
+      setEmail={setEmail}
+      password={password}
+      setPassword={setPassword}
+      loadingForm={loadingForm}
+      emailError={emailError}
+      passwordError={passwordError}
+      globalAuthError={globalAuthError}
+      handleCreateAccount={handleCreateAccount}
       handleGoogleSignIn={handleGoogleSignIn}
       handleAppleSignIn={handleAppleSignIn}
       onBack={() => navigation.goBack()}

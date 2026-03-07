@@ -1,10 +1,12 @@
 import React from 'react';
-import { Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { useToast } from '../../context/ToastContext';
 import { useDashboard } from './useDashboard';
 import { DashboardView } from './DashboardView';
 import { dashboardStyles } from './DashboardStyles';
 
 export default function DashboardScreen({ user }) {
+  const { showToast } = useToast();
   const {
     loading,
     nombre,
@@ -27,21 +29,24 @@ export default function DashboardScreen({ user }) {
     motivationalMessage,
     proximaCarrera,
     diasParaCarrera,
+    city,
+    climaData,
+    locationPermission,
+    loadingLocation,
+    onRequestLocation,
+    readinessPct,
+    enrollToRace,
+    unenrollFromRace,
   } = useDashboard(user);
 
-  const handleReportInjury = () => {
-    Alert.alert('Reporte de lesión 🩹', 'Notifica a XERPA AI sobre tu malestar para ajustar tu plan.', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Ir a XERPA AI', onPress: () => {} },
-    ]);
-  };
+  const navigation = useNavigation();
 
   const handleOpenXerpa = () => {
-    Alert.alert('PXERPA', 'Próximamente: acceso directo al chat con XERPA AI.');
+    navigation.navigate('XerpaAI');
   };
 
   const handleSyncData = () => {
-    Alert.alert('Sincronización', 'Próximamente: sincronización con Intervalos.icu y Strava.');
+    showToast({ type: 'info', title: 'Sincronización', message: 'Próximamente: sincronización con Intervalos.icu y Strava.' });
   };
 
   return (
@@ -54,6 +59,7 @@ export default function DashboardScreen({ user }) {
       tssSemanal={tssSemanal}
       tssPlaneadoSemanal={tssPlaneadoSemanal}
       tssProgressPct={tssProgressPct}
+      readinessPct={readinessPct}
       entrenoHoy={entrenoHoy}
       hasData={hasData}
       hasReportedToday={hasReportedToday}
@@ -67,9 +73,15 @@ export default function DashboardScreen({ user }) {
       motivationalMessage={motivationalMessage}
       proximaCarrera={proximaCarrera}
       diasParaCarrera={diasParaCarrera}
-      onReportInjury={handleReportInjury}
+      city={city}
+      climaData={climaData}
+      locationPermission={locationPermission}
+      loadingLocation={loadingLocation}
+      onRequestLocation={onRequestLocation}
       onOpenXerpa={handleOpenXerpa}
       onSyncData={handleSyncData}
+      enrollToRace={enrollToRace}
+      unenrollFromRace={unenrollFromRace}
       styles={dashboardStyles}
     />
   );

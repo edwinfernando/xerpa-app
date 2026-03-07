@@ -3,8 +3,14 @@ import { useXerpaAI } from './useXerpaAI';
 import { XerpaAIView } from './XerpaAIView';
 import { xerpaAIStyles } from './XerpaAIStyles';
 
-export default function XerpaAIScreen({ user }) {
-  const { messages, input, setInput, loading, sendMessage } = useXerpaAI(user);
+export default function XerpaAIScreen({ user, route, onboardingParams, onOnboardingConsumed }) {
+  const initialContext = route?.params?.initialContext;
+  const { messages, input, setInput, loading, sendMessage } = useXerpaAI(
+    user,
+    onboardingParams,
+    onOnboardingConsumed,
+    initialContext
+  );
 
   return (
     <XerpaAIView

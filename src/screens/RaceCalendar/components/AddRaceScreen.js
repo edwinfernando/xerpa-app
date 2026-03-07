@@ -10,20 +10,23 @@ import {
 } from 'react-native';
 import Modal from 'react-native-modal';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Calendar, ChevronDown } from 'lucide-react-native';
+import { Calendar, ChevronDown, MapPin } from 'lucide-react-native';
 import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/Button';
+import { ScreenWrapper } from '../../../components/ScreenWrapper';
 import { showXerpaError } from '../../../utils/ErrorHandler';
-import { useModalSwipeScroll } from '../../../hooks/useModalSwipeScroll';
 import { PRIORIDADES } from '../../../constants/prioridades';
 
 const DATE_REGEX = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const EMPTY_FORM = {
   nombre: '',
+  circuito_nombre: '',
   fecha_inicio: '',
   fecha_fin: '',
   ciudad: '',
   pais: '',
+  latitud: '',
+  longitud: '',
   distancia_km: '',
   desnivel_m: '',
   prioridad: 'B',
@@ -41,11 +44,25 @@ const EMPTY_FORM = {
   ciudad_nombre: '',
 };
 
+function normalizeText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
 function formatDateLabel(dateStr) {
   if (!dateStr) return 'Seleccionar fecha';
   const d = new Date(`${dateStr}T00:00:00`);
   if (Number.isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function getTodayStart() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
 function OptionPickerSheet({
@@ -147,15 +164,16 @@ function OptionField({
   );
 }
 
-export function AddRaceModal({
-  visible,
-  onClose,
+export function AddRaceScreen({
   onSave,
   showToast,
   styles,
   catalogs,
   catalogLoading,
   onLoadCatalogs,
+  onSaved,
+  navigation,
+  route,
 }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [nombreError, setNombreError] = useState('');
@@ -165,15 +183,6 @@ export function AddRaceModal({
   const [showDatePickerFor, setShowDatePickerFor] = useState(null);
   const [activeSelector, setActiveSelector] = useState(null);
   const [selectorSearch, setSelectorSearch] = useState('');
-
-  const SWIPE_HEADER_HEIGHT = 95;
-  const {
-    scrollViewRef,
-    scrollOffsetY,
-    propagateSwipe,
-    scrollTo,
-    onScroll,
-  } = useModalSwipeScroll(SWIPE_HEADER_HEIGHT, visible);
 
   const tiposEvento = catalogs?.tiposEvento || [];
   const formatosEvento = catalogs?.formatosEvento || [];
@@ -231,8 +240,79 @@ export function AddRaceModal({
   }, [activeSelector, tiposEvento, formatosEvento, tiposDeporte, paises, ciudadesFiltradas, catalogLoading, form.pais_id]);
 
   useEffect(() => {
-    if (visible) onLoadCatalogs?.();
-  }, [visible, onLoadCatalogs]);
+    onLoadCatalogs?.();
+  }, [onLoadCatalogs]);
+
+  useEffect(() => {
+    const picked = route?.params?.pickedLocation;
+    if (!picked) return;
+    if (picked?.clear) {
+      setForm((prev) => ({
+        ...prev,
+        latitud: '',
+        longitud: '',
+      }));
+      navigation?.setParams?.({ pickedLocation: undefined });
+      return;
+    }
+    const lat = Number(picked.latitud);
+    const lon = Number(picked.longitud);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      setForm((prev) => {
+        const next = {
+          ...prev,
+          latitud: String(lat),
+          longitud: String(lon),
+        };
+        const address = picked.address || null;
+        const countryName = address?.country || '';
+        const cityName = address?.city || '';
+        const districtName = address?.district || '';
+        const streetName = address?.street || address?.name || '';
+        const circuitoSugerido = [streetName, districtName].filter(Boolean).join(' - ');
+
+        // Solo completamos automáticamente campos vacíos para no pisar edición manual.
+        if (!next.circuito_nombre && circuitoSugerido) {
+          next.circuito_nombre = circuitoSugerido;
+        }
+
+        const normalizedCountry = normalizeText(countryName);
+        const matchedPais = normalizedCountry
+          ? paises.find((p) => normalizeText(p?.nombre) === normalizedCountry)
+          : null;
+
+        if (!next.pais_id && matchedPais) {
+          next.pais_id = matchedPais.id;
+          next.pais_nombre = matchedPais.nombre || '';
+          next.pais = matchedPais.nombre || '';
+        } else if (!next.pais && countryName) {
+          next.pais = countryName;
+          next.pais_nombre = countryName;
+        }
+
+        const normalizedCity = normalizeText(cityName);
+        const searchPaisId = matchedPais?.id || next.pais_id || null;
+        const sourceCiudades = searchPaisId
+          ? ciudades.filter((c) => c.pais_id === searchPaisId)
+          : ciudades;
+        const matchedCiudad = normalizedCity
+          ? sourceCiudades.find((c) => normalizeText(c?.nombre) === normalizedCity)
+          : null;
+
+        if (!next.ciudad_id && matchedCiudad) {
+          next.ciudad_id = matchedCiudad.id;
+          next.ciudad_nombre = matchedCiudad.nombre || '';
+          next.ciudad = matchedCiudad.nombre || '';
+        } else if (!next.ciudad && cityName) {
+          next.ciudad = cityName;
+          next.ciudad_nombre = cityName;
+        }
+
+        return next;
+      });
+    }
+    navigation?.setParams?.({ pickedLocation: undefined });
+  }, [route?.params?.pickedLocation, navigation, paises, ciudades]);
 
   function openSelector(key) {
     setActiveSelector(key);
@@ -293,21 +373,6 @@ export function AddRaceModal({
     if (field === 'fecha_fin' && fechaFinError) setFechaFinError('');
   }
 
-  function reset() {
-    setForm(EMPTY_FORM);
-    setNombreError('');
-    setFechaInicioError('');
-    setFechaFinError('');
-    setSaving(false);
-  }
-
-  function handleClose() {
-    reset();
-    setShowDatePickerFor(null);
-    closeSelector();
-    onClose();
-  }
-
   function handleDateChange(event, selectedDate) {
     if (event?.type === 'dismissed') {
       setShowDatePickerFor(null);
@@ -350,8 +415,8 @@ export function AddRaceModal({
     setSaving(true);
     try {
       await onSave(form);
-      reset();
-      onClose();
+      setForm(EMPTY_FORM);
+      onSaved?.();
     } catch (err) {
       showXerpaError(err, 'RACE-ADD-01', showToast);
       setNombreError(err?.message ?? 'Error al guardar.');
@@ -361,46 +426,36 @@ export function AddRaceModal({
   }
 
   return (
-    <Modal
-      isVisible={visible}
-      onBackdropPress={handleClose}
-      onBackButtonPress={handleClose}
-      onSwipeComplete={handleClose}
-      swipeDirection={scrollOffsetY <= 0 ? ['down'] : undefined}
-      propagateSwipe={propagateSwipe}
-      scrollTo={scrollTo}
-      scrollOffset={scrollOffsetY}
-      scrollOffsetMax={0}
-      animationIn="slideInUp"
-      animationOut="slideOutDown"
-      style={{ margin: 0, justifyContent: 'flex-end' }}
-    >
+    <ScreenWrapper style={styles.safeContainer} edges={['left', 'right']}>
       <KeyboardAvoidingView
-        style={styles.manualModalOverlay}
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={handleClose} />
-        <View style={styles.manualModalSheet}>
-          <View style={styles.manualModalHandle} />
-          <Text style={styles.manualModalTitle}>Nueva Carrera</Text>
-
+        <View style={[styles.manualModalSheet, { flex: 1, maxHeight: undefined, borderTopLeftRadius: 0, borderTopRightRadius: 0 }]}>
           <ScrollView
-            ref={scrollViewRef}
             showsVerticalScrollIndicator={false}
             bounces={false}
             decelerationRate="fast"
             keyboardShouldPersistTaps="handled"
             overScrollMode="never"
-            onScroll={onScroll}
-            scrollEventThrottle={16}
+            contentContainerStyle={{ paddingBottom: 28 }}
           >
-            <Text style={styles.manualLabel}>Nombre del evento *</Text>
+            <Text style={styles.manualLabel}>Nombre del evento / copa *</Text>
             <Input
               value={form.nombre}
               onChangeText={(v) => setField('nombre', v)}
-              placeholder="Ej. XCO Copa Andalucía"
+              placeholder="Ej. Copa Andalucía XCO"
               error={!!nombreError}
               errorText={nombreError}
+              style={{ marginBottom: 14 }}
+              editable={!saving}
+            />
+
+            <Text style={styles.manualLabel}>Nombre del circuito / pista</Text>
+            <Input
+              value={form.circuito_nombre}
+              onChangeText={(v) => setField('circuito_nombre', v)}
+              placeholder="Ej. Pista Cerro Verde"
               style={{ marginBottom: 16 }}
               editable={!saving}
             />
@@ -411,7 +466,9 @@ export function AddRaceModal({
                 styles.manualDateTrigger,
                 !!fechaInicioError && styles.manualDateTriggerError,
               ]}
-              onPress={() => setShowDatePickerFor('fecha_inicio')}
+              onPress={() =>
+                setShowDatePickerFor((prev) => (prev === 'fecha_inicio' ? null : 'fecha_inicio'))
+              }
               activeOpacity={0.85}
               disabled={saving}
             >
@@ -421,6 +478,27 @@ export function AddRaceModal({
               </Text>
             </TouchableOpacity>
             {!!fechaInicioError && <Text style={styles.formHelperText}>{fechaInicioError}</Text>}
+            {showDatePickerFor === 'fecha_inicio' && Platform.OS === 'ios' && (
+              <>
+                <View style={{ backgroundColor: '#1C1C1E', borderRadius: 14, paddingVertical: 12, marginBottom: 8 }}>
+                  <DateTimePicker
+                    mode="date"
+                    value={form.fecha_inicio ? new Date(`${form.fecha_inicio}T00:00:00`) : new Date()}
+                    display="inline"
+                    onChange={handleDateChange}
+                    minimumDate={getTodayStart()}
+                    maximumDate={new Date(2030, 11, 31)}
+                    locale="es-ES"
+                    themeVariant="dark"
+                  />
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 16 }}>
+                  <TouchableOpacity onPress={() => setShowDatePickerFor(null)} activeOpacity={0.7}>
+                    <Text style={{ color: '#00D2FF', fontWeight: '700' }}>Cerrar</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
 
             <Text style={styles.manualLabel}>Fecha fin (opcional)</Text>
             <TouchableOpacity
@@ -429,7 +507,9 @@ export function AddRaceModal({
                 !!fechaFinError && styles.manualDateTriggerError,
                 { marginBottom: 16 },
               ]}
-              onPress={() => setShowDatePickerFor('fecha_fin')}
+              onPress={() =>
+                setShowDatePickerFor((prev) => (prev === 'fecha_fin' ? null : 'fecha_fin'))
+              }
               activeOpacity={0.85}
               disabled={saving}
             >
@@ -439,6 +519,31 @@ export function AddRaceModal({
               </Text>
             </TouchableOpacity>
             {!!fechaFinError && <Text style={styles.formHelperText}>{fechaFinError}</Text>}
+            {showDatePickerFor === 'fecha_fin' && Platform.OS === 'ios' && (
+              <>
+                <View style={{ backgroundColor: '#1C1C1E', borderRadius: 14, paddingVertical: 12, marginBottom: 8 }}>
+                  <DateTimePicker
+                    mode="date"
+                    value={form.fecha_fin ? new Date(`${form.fecha_fin}T00:00:00`) : new Date()}
+                    display="inline"
+                    onChange={handleDateChange}
+                    minimumDate={
+                      form.fecha_inicio
+                        ? new Date(`${form.fecha_inicio}T00:00:00`)
+                        : getTodayStart()
+                    }
+                    maximumDate={new Date(2030, 11, 31)}
+                    locale="es-ES"
+                    themeVariant="dark"
+                  />
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 16 }}>
+                  <TouchableOpacity onPress={() => setShowDatePickerFor(null)} activeOpacity={0.7}>
+                    <Text style={{ color: '#00D2FF', fontWeight: '700' }}>Cerrar</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
 
             <OptionField
               title="Tipo de evento"
@@ -484,6 +589,52 @@ export function AddRaceModal({
               styles={styles}
               disabled={!form.pais_id}
             />
+
+            {!catalogLoading && !tiposEvento.length && (
+              <Text style={styles.manualSelectEmptyText}>
+                No hay catálogos disponibles. Revisa migraciones y permisos.
+              </Text>
+            )}
+
+            <Text style={styles.manualLabel}>Ubicación en mapa (lat / lon)</Text>
+            <View style={styles.manualRow}>
+              <View style={styles.manualRowItem}>
+                <Input
+                  value={form.latitud}
+                  onChangeText={(v) => setField('latitud', v)}
+                  placeholder="Latitud"
+                  keyboardType="numeric"
+                  style={{ marginBottom: 16 }}
+                  editable={!saving}
+                />
+              </View>
+              <View style={styles.manualRowItem}>
+                <Input
+                  value={form.longitud}
+                  onChangeText={(v) => setField('longitud', v)}
+                  placeholder="Longitud"
+                  keyboardType="numeric"
+                  style={{ marginBottom: 16 }}
+                  editable={!saving}
+                />
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.manualSelectField, { marginBottom: 12 }]}
+              activeOpacity={0.85}
+              onPress={() =>
+                navigation?.navigate?.('AddRaceMapPicker', {
+                  latitud: form.latitud || null,
+                  longitud: form.longitud || null,
+                })
+              }
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <MapPin size={14} color="#00D2FF" />
+                <Text style={styles.manualSelectFieldText}>Elegir ubicación en mapa</Text>
+              </View>
+              <Text style={styles.manualPickerClose}>Abrir</Text>
+            </TouchableOpacity>
 
             <Text style={styles.manualLabel}>Distancia (km) / Desnivel (m D+)</Text>
             <View style={styles.manualRow}>
@@ -545,7 +696,7 @@ export function AddRaceModal({
               />
             </View>
 
-            {showDatePickerFor && (
+            {showDatePickerFor && Platform.OS === 'android' && (
               <DateTimePicker
                 mode="date"
                 value={
@@ -553,8 +704,14 @@ export function AddRaceModal({
                     ? new Date(`${form[showDatePickerFor]}T00:00:00`)
                     : new Date()
                 }
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                display="default"
                 onChange={handleDateChange}
+                minimumDate={
+                  showDatePickerFor === 'fecha_fin' && form.fecha_inicio
+                    ? new Date(`${form.fecha_inicio}T00:00:00`)
+                    : getTodayStart()
+                }
+                maximumDate={new Date(2030, 11, 31)}
               />
             )}
           </ScrollView>
@@ -579,7 +736,7 @@ export function AddRaceModal({
         styles={styles}
         emptyText={selectorMeta.emptyText}
       />
-    </Modal>
+    </ScreenWrapper>
   );
 }
 

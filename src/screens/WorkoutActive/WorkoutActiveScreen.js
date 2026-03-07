@@ -25,7 +25,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { getTodayPlan } from '../../services/offlineStorage';
 import { saveManualEffort } from '../../services/effortSync';
 import { useNavigationBarColor } from '../../hooks/useNavigationBarColor';
-import { theme } from '../../styles/theme';
+import { useModalSwipeScroll } from '../../hooks/useModalSwipeScroll';
+import { theme } from '../../theme/theme';
+import { formatDuracion } from '../../utils/formatDuracion';
 
 // ─── Constantes ─────────────────────────────────────────────
 const RPE_LABELS = {
@@ -45,13 +47,6 @@ function getRpeColor(n) {
   if (n <= 3) return theme.colors.primary; // verde
   if (n <= 6) return '#ffca28'; // amarillo
   return theme.colors.danger; // rojo
-}
-
-function formatDuracion(min) {
-  if (!min) return null;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return h > 0 ? `${h}h ${m > 0 ? m + 'min' : ''}`.trim() : `${m} min`;
 }
 
 function formatTimer(secs) {
@@ -81,6 +76,7 @@ function Toast({ message, visible, onHide }) {
 function RPEBottomSheet({ visible, totalSecs, onClose, onSave }) {
   const [rpe, setRpe] = useState(5);
   const [saving, setSaving] = useState(false);
+  const { scrollOffsetY } = useModalSwipeScroll(110, visible);
 
   useEffect(() => {
     if (visible) setRpe(5);
@@ -102,7 +98,7 @@ function RPEBottomSheet({ visible, totalSecs, onClose, onSave }) {
       onBackdropPress={() => onClose()}
       onBackButtonPress={() => onClose()}
       onSwipeComplete={() => onClose()}
-      swipeDirection={['down']}
+      swipeDirection={scrollOffsetY <= 0 ? ['down'] : undefined}
       propagateSwipe={true}
       animationIn="slideInUp"
       animationOut="slideOutDown"
@@ -484,7 +480,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A1A',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: theme.SHEET_PADDING_BOTTOM,
     borderTopWidth: 1,
@@ -587,7 +583,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.cardBackground,
     borderRadius: 14,
     paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: theme.colors.primary + '44',
   },

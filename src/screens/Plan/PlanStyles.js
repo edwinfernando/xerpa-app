@@ -1,75 +1,36 @@
 import { StyleSheet, Platform } from 'react-native';
-import { theme } from '../../styles/theme';
+import { theme } from '../../theme/theme';
+import { sharedScreenStyles } from '../../styles/sharedScreenStyles';
+
+const HEADER_TOP = Platform.OS === 'ios' ? 4 : 0;
 
 export const planStyles = StyleSheet.create({
+  ...sharedScreenStyles,
+
   safeContainer: { flex: 1, backgroundColor: theme.colors.background },
-  scrollContent: {
-    paddingHorizontal: theme.spacing.screenPadding,
-    paddingTop: 20,
-    paddingBottom: 48,
-  },
 
-  // ── Header ───────────────────────────────────────────────
-  header: {
-    paddingBottom: 8,
-  },
-  headerMeta: {
-    color: '#555',
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    marginBottom: 2,
-  },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-    marginBottom: 16,
-  },
-
-  // ── Segmented Control ─────────────────────────────────────
-  segmented: {
+  // ── Header (Plan-specific: marginTop, headerLeft) ──────────
+  headerRow: {
     flexDirection: 'row',
-    backgroundColor: '#1A1A1A',
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginTop: HEADER_TOP,
+    paddingBottom: 16,
+    minHeight: 50,
   },
-  segmentBtn: {
+  headerLeft: {
     flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 10,
-  },
-  segmentBtnActive: {
-    backgroundColor: '#00F0FF',
-    shadowColor: '#00F0FF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-  },
-  segmentText: {
-    color: '#555',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  segmentTextActive: {
-    color: '#121212',
-    fontWeight: '800',
+    minWidth: 0,
+    marginRight: 12,
   },
 
   // ── Action Bar ────────────────────────────────────────────
   actionBar: {
     flexDirection: 'row',
     marginBottom: 20,
-    gap: 10,
   },
   actionPrimary: {
-    flex: 1.3,
+    flex: 1,
     borderRadius: 14,
     overflow: 'hidden',
   },
@@ -87,23 +48,6 @@ export const planStyles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.2,
   },
-  actionGhost: {
-    flex: 1,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#333',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    gap: 6,
-  },
-  actionGhostText: {
-    color: '#888',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-
   // ── Card Base ─────────────────────────────────────────────
   card: {
     backgroundColor: '#1A1A1A',
@@ -121,23 +65,63 @@ export const planStyles = StyleSheet.create({
     right: 14,
   },
 
-  // ── Card Past ─────────────────────────────────────────────
-  cardPast: {
+  // ── Card Past (contenedor atenuado) ────────────────────────
+  pastCardContainer: {
     opacity: 0.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 12,
+    borderWidth: 0,
+  },
+  cardPast: {
+    // Hereda del contenedor; sin bordes brillantes
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    marginBottom: 0,
   },
 
-  // ── Card Today (Focus) ────────────────────────────────────
-  cardToday: {
-    borderColor: '#39FF14',
-    borderWidth: 2,
-    backgroundColor: '#141A14',
-    shadowColor: '#39FF14',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 10,
-    marginHorizontal: -6,
+  // ── Card Today (Focus + Glow dominante) ────────────────────
+  todayCardContainer: {
+    backgroundColor: 'rgba(30, 30, 30, 0.9)',
+    borderRadius: 24,
     padding: 20,
+    marginVertical: 12,
+    borderWidth: 1.5,
+    borderColor: '#00D2FF',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#00D2FF',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.35,
+        shadowRadius: 12,
+      },
+      android: { elevation: 8 },
+      default: {},
+    }),
+  },
+  cardToday: {
+    // Hereda del contenedor; sin duplicar estilos
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    marginBottom: 0,
+    padding: 0,
+  },
+
+  // ── Today Action Button (CTA masivo) ───────────────────────
+  todayActionButton: {
+    backgroundColor: '#00D2FF',
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  todayActionText: {
+    color: '#000000',
+    fontWeight: '800',
+    fontSize: 16,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
 
   // ── Card Rest (no workout) ────────────────────────────────
@@ -212,12 +196,12 @@ export const planStyles = StyleSheet.create({
     fontSize: 12,
   },
 
-  // ── Today Pill Label ──────────────────────────────────────
+  // ── Today Pill / Badge "HOY" (en vivo) ─────────────────────
   todayPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   todayPillDot: {
     width: 8,
@@ -231,6 +215,12 @@ export const planStyles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.2,
     textTransform: 'uppercase',
+  },
+  cardTitleToday: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 26,
   },
 
   // ── Historial ─────────────────────────────────────────────
@@ -298,7 +288,7 @@ export const planStyles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
-    paddingHorizontal: 40,
+    paddingHorizontal: 24,
   },
   emptyIcon: { fontSize: 44, marginBottom: 16 },
   emptyTitle: {
@@ -315,14 +305,71 @@ export const planStyles = StyleSheet.create({
     lineHeight: 22,
   },
 
-  // ── Loading ───────────────────────────────────────────────
-  loadingContainer: {
+  // ── Empty Plan State (Semana en Blanco) ────────────────────
+  emptyPlanContainer: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    marginTop: 40,
+  },
+  emptyPlanIconWrap: {
+    marginBottom: 0,
+  },
+  emptyPlanTitle: {
+    fontSize: 20,
+    color: '#FFF',
+    fontWeight: 'bold',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptyPlanText: {
+    fontSize: 14,
+    color: '#8E8E93',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  emptyPlanButton: {
+    backgroundColor: '#00D2FF',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    minWidth: 280,
+  },
+  emptyPlanButtonText: {
+    color: '#000000',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+
+  // ── Empty History State (hermano gemelo de EmptyPlanState) ──
+  emptyHistorySecondaryBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333333',
+    alignItems: 'center',
+  },
+  emptyHistorySecondaryBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+
+  // ── Loading (Skeleton) ─────────────────────────────────────
+  skeletonWrap: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.screenPadding,
+    paddingTop: 20,
     gap: 12,
   },
-  loadingText: { color: '#555', fontSize: 14 },
+  skeletonCard: {
+    alignSelf: 'stretch',
+  },
 
   // ── Manual Workout Modal ───────────────────────────────────
   manualModalOverlay: {
@@ -334,7 +381,7 @@ export const planStyles = StyleSheet.create({
     backgroundColor: '#1A1A1A',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 40,
     borderTopWidth: 1,
@@ -357,12 +404,33 @@ export const planStyles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   manualLabel: {
-    color: '#555',
-    fontSize: 11,
+    color: '#9CA3AF',
+    fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
     marginBottom: 8,
+  },
+  manualDateTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#1C1C1E',
+    borderWidth: 1,
+    borderColor: '#3A3A3C',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 16,
+  },
+  manualDateTriggerText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  manualDateTriggerPlaceholder: {
+    color: '#8E8E93',
+    fontWeight: '500',
   },
   manualInput: {
     backgroundColor: '#121212',
@@ -467,7 +535,7 @@ export const planStyles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.85)',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 20,
   },
   generatingCard: {
     backgroundColor: '#1A1A1A',
@@ -481,6 +549,14 @@ export const planStyles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 20,
     width: '100%',
+  },
+  generatingSkeletons: {
+    gap: 10,
+    marginBottom: 20,
+    alignSelf: 'stretch',
+  },
+  generatingSkeletonCard: {
+    alignSelf: 'stretch',
   },
   generatingTitle: {
     color: '#fff',
@@ -507,7 +583,7 @@ export const planStyles = StyleSheet.create({
     backgroundColor: '#131313',
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 44,
     borderTopWidth: 1,
@@ -620,7 +696,7 @@ export const planStyles = StyleSheet.create({
     backgroundColor: '#131313',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 44,
     borderTopWidth: 1,
@@ -677,6 +753,44 @@ export const planStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     marginBottom: 14,
+  },
+  detailHoraPuntoRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 14,
+  },
+  detailHoraPuntoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  detailHoraPuntoText: {
+    color: '#00F0FF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // Badge de origen (IA / Entrenador)
+  detailOrigenBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  detailOrigenBadgeIa: {
+    backgroundColor: 'rgba(0,240,255,0.08)',
+    borderColor: 'rgba(0,240,255,0.35)',
+  },
+  detailOrigenBadgeText: {
+    color: '#00F0FF',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 
   // Status badge
@@ -814,5 +928,8 @@ export const planStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
     letterSpacing: 0.2,
+  },
+  detailFeedbackInput: {
+    marginBottom: 16,
   },
 });

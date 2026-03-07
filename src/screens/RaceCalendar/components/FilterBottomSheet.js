@@ -1,63 +1,89 @@
 /**
- * FilterBottomSheet — Filtros avanzados en bottom sheet
- * País, Tipo Deporte (MTB, Ruta, Gravel), Nivel de Dificultad (1-5)
+ * FilterBottomSheet — Panel de filtros ergonómico por secciones.
+ * Orden: Ordenar por, Mes, Modalidad, Ubicación.
  */
-import React, { useRef, useCallback, useState, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   TouchableOpacity,
   Text,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
 } from 'react-native';
 import Modal from 'react-native-modal';
-import { Button } from '../../../components/ui/Button';
-import { Input } from '../../../components/ui/Input';
-import { TIPOS_DEPORTE } from '../useRaceCalendar';
+import { useModalSwipeScroll } from '../../../hooks/useModalSwipeScroll';
 
-const NIVELES_DIFICULTAD = [
-  { value: '', label: 'Todo' },
-  { value: '1', label: '1' },
-  { value: '2', label: '2' },
-  { value: '3', label: '3' },
-  { value: '4', label: '4' },
-  { value: '5', label: '5' },
+const SORT_OPTIONS = [
+  { value: 'fecha_asc', label: 'Más Próximas' },
+  { value: 'distancia_desc', label: 'Mayor Distancia' },
+  { value: 'desnivel_desc', label: 'Mayor Desnivel' },
 ];
 
-const SWIPE_HEADER_HEIGHT = 90;
+const SWIPE_HEADER_HEIGHT = 80;
 
-export function FilterBottomSheet({ visible, onClose, filters, setFilter, styles }) {
-  const [scrollOffsetY, setScrollOffsetY] = useState(0);
-  const scrollViewRef = useRef(null);
-  const scrollOffsetRef = useRef(0);
-  const hasActive = filters.pais?.trim() || filters.tipoDeporte?.trim() || filters.nivelDificultad !== '';
+function RenderFilterSection({
+  title,
+  data = [],
+  selectedValue = '',
+  onSelect,
+  styles,
+}) {
+  if (!data.length) return null;
 
-  useEffect(() => {
-    if (visible) {
-      setScrollOffsetY(0);
-      scrollOffsetRef.current = 0;
-    }
-  }, [visible]);
+  return (
+    <View style={styles.filterSectionWrap}>
+      <Text style={styles.filterSectionLabel}>{title}</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterChipsRow}
+      >
+        {data.map((option) => {
+          const isActive = (selectedValue || '').toLowerCase() === (option || '').toLowerCase();
+          return (
+            <TouchableOpacity
+              key={`${title}-${option}`}
+              style={[styles.filterChip, isActive && styles.filterChipActive]}
+              onPress={() => onSelect(isActive ? '' : option)}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                {option}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
 
-  const propagateSwipe = useCallback((evt) => {
-    const locationY = evt?.nativeEvent?.locationY ?? 0;
-    return locationY > SWIPE_HEADER_HEIGHT;
-  }, []);
+export function FilterBottomSheet({
+  visible,
+  onClose,
+  filters,
+  setFilter,
+  filterOptions = { meses: [], paises: [], deportes: [], tiposEvento: [], formatos: [], copas: [] },
+  filteredCount,
+  onClearAll,
+  styles,
+}) {
+  const {
+    scrollViewRef,
+    scrollOffsetY,
+    propagateSwipe,
+    scrollTo,
+    onScroll,
+  } = useModalSwipeScroll(SWIPE_HEADER_HEIGHT, visible);
 
-  const scrollTo = useCallback((offset) => {
-    if (offset && typeof offset.y === 'number') {
-      const currentY = scrollOffsetRef.current;
-      const newY = Math.max(0, currentY + offset.y);
-      scrollViewRef.current?.scrollTo({ y: newY, animated: false });
-    }
-  }, []);
-
-  function clearAll() {
-    setFilter('pais', '');
-    setFilter('tipoDeporte', '');
-    setFilter('nivelDificultad', '');
-  }
+  const paises = filterOptions.paises || [];
+  const deportes = filterOptions.deportes || [];
+  const tiposEvento = filterOptions.tiposEvento || [];
+  const formatos = filterOptions.formatos || [];
+  const copas = filterOptions.copas || [];
+  const meses = filterOptions.meses || [];
+  const applyLabel = Number.isFinite(filteredCount)
+    ? `Mostrar ${filteredCount} Carreras`
+    : 'Aplicar Filtros';
 
   return (
     <Modal
@@ -74,90 +100,93 @@ export function FilterBottomSheet({ visible, onClose, filters, setFilter, styles
       animationOut="slideOutDown"
       style={{ margin: 0, justifyContent: 'flex-end' }}
     >
-      <KeyboardAvoidingView
-        style={styles.sheetOverlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <View style={styles.sheetOverlay}>
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
-          <View style={styles.filterSheet}>
+        <View style={styles.filterSheet}>
           <View style={[styles.sheetHandle, { backgroundColor: '#E5E5EA' }]} />
           <View style={styles.filterSheetHeader}>
             <Text style={styles.sheetTitle}>Filtros</Text>
-            {hasActive && (
-              <Button
-                title="Limpiar"
-                variant="ghost"
-                size="compact"
-                onPress={clearAll}
-                style={styles.filterClearBtn}
-              />
-            )}
+            <TouchableOpacity onPress={onClearAll} style={styles.filterClearBtn} disabled={!onClearAll}>
+              <Text style={styles.filterClearBtnText}>Restablecer</Text>
+            </TouchableOpacity>
           </View>
 
           <ScrollView
             ref={scrollViewRef}
             showsVerticalScrollIndicator={false}
             bounces={false}
-            decelerationRate="fast"
             keyboardShouldPersistTaps="handled"
-            overScrollMode="never"
-            onScroll={(e) => {
-              const currentOffset = e.nativeEvent.contentOffset.y;
-              const y = currentOffset < 0 ? 0 : currentOffset;
-              setScrollOffsetY(y);
-              scrollOffsetRef.current = y;
-            }}
+            onScroll={onScroll}
             scrollEventThrottle={16}
+            contentContainerStyle={styles.filterSheetScrollContent}
           >
-            <View style={styles.filterSheetContent}>
-              <Text style={styles.formLabel}>País</Text>
-              <Input
-                value={filters.pais}
-                onChangeText={(v) => setFilter('pais', v)}
-                placeholder="Ej. Colombia, España"
-                style={{ marginBottom: 16 }}
-              />
+            <RenderFilterSection
+              title="Ordenar por"
+              data={SORT_OPTIONS.map((x) => x.label)}
+              selectedValue={SORT_OPTIONS.find((x) => x.value === (filters.sortBy || 'fecha_asc'))?.label}
+              onSelect={(label) => {
+                const selected = SORT_OPTIONS.find((x) => x.label === label);
+                setFilter('sortBy', selected?.value || 'fecha_asc');
+              }}
+              styles={styles}
+            />
 
-              <Text style={styles.formLabel}>Tipo de deporte</Text>
-              <View style={styles.filterSelectWrap}>
-                {TIPOS_DEPORTE.map((t) => (
-                  <TouchableOpacity
-                    key={t}
-                    style={[styles.filterChip, filters.tipoDeporte === t && styles.filterChipActive]}
-                    onPress={() => setFilter('tipoDeporte', filters.tipoDeporte === t ? '' : t)}
-                  >
-                    <Text style={[styles.filterChipText, filters.tipoDeporte === t && styles.filterChipTextActive]}>
-                      {t}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <RenderFilterSection
+              title="Mes"
+              data={meses}
+              selectedValue={filters.mes || ''}
+              onSelect={(value) => setFilter('mes', value)}
+              styles={styles}
+            />
 
-              <Text style={styles.formLabel}>Nivel de dificultad</Text>
-              <View style={styles.filterSelectWrap}>
-                {NIVELES_DIFICULTAD.map(({ value, label }) => (
-                  <TouchableOpacity
-                    key={value || 'all'}
-                    style={[styles.filterChip, filters.nivelDificultad === value && styles.filterChipActive]}
-                    onPress={() => setFilter('nivelDificultad', value)}
-                  >
-                    <Text style={[styles.filterChipText, filters.nivelDificultad === value && styles.filterChipTextActive]}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+            <RenderFilterSection
+              title="Modalidad"
+              data={deportes}
+              selectedValue={filters.tipoDeporte || ''}
+              onSelect={(value) => setFilter('tipoDeporte', value)}
+              styles={styles}
+            />
 
-            <Button
-              title="Aplicar"
-              variant="solid"
-              onPress={onClose}
-              style={styles.filterSheetApply}
+            <RenderFilterSection
+              title="Tipo de evento"
+              data={tiposEvento}
+              selectedValue={filters.tipoEvento || ''}
+              onSelect={(value) => setFilter('tipoEvento', value)}
+              styles={styles}
+            />
+
+            <RenderFilterSection
+              title="Formato"
+              data={formatos}
+              selectedValue={filters.formatoEvento || ''}
+              onSelect={(value) => setFilter('formatoEvento', value)}
+              styles={styles}
+            />
+
+            <RenderFilterSection
+              title="Copa"
+              data={copas}
+              selectedValue={filters.copa || ''}
+              onSelect={(value) => setFilter('copa', value)}
+              styles={styles}
+            />
+
+            <RenderFilterSection
+              title="Ubicación"
+              data={paises}
+              selectedValue={filters.pais || ''}
+              onSelect={(value) => setFilter('pais', value)}
+              styles={styles}
             />
           </ScrollView>
+
+          <View style={styles.filterSheetFooter}>
+            <TouchableOpacity style={styles.filterSheetApply} onPress={onClose} activeOpacity={0.9}>
+              <Text style={styles.filterSheetApplyText}>{applyLabel}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }

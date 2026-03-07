@@ -1,7 +1,7 @@
 /**
  * NotificacionesSheet — BottomSheet de edición: Preferencias y Notificaciones
  */
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,10 +12,10 @@ import {
   Switch,
 } from 'react-native';
 import Modal from 'react-native-modal';
-import { theme } from '../../../theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
+import { useModalSwipeScroll } from '../../../hooks/useModalSwipeScroll';
 
 const CANAL_OPTIONS = [
   { value: 'Telegram', label: 'Telegram', icon: 'logo-telegram' },
@@ -36,31 +36,15 @@ export function NotificacionesSheet({
   const [alertasEntrenamiento, setAlertasEntrenamiento] = useState(true);
   const [alertasSistema, setAlertasSistema] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [scrollOffsetY, setScrollOffsetY] = useState(0);
-  const scrollViewRef = useRef(null);
-  const scrollOffsetRef = useRef(0);
 
   const SWIPE_HEADER_HEIGHT = 100;
-
-  useEffect(() => {
-    if (visible) {
-      setScrollOffsetY(0);
-      scrollOffsetRef.current = 0;
-    }
-  }, [visible]);
-
-  const propagateSwipe = useCallback((evt) => {
-    const locationY = evt?.nativeEvent?.locationY ?? 0;
-    return locationY > SWIPE_HEADER_HEIGHT;
-  }, []);
-
-  const scrollTo = useCallback((offset) => {
-    if (offset && typeof offset.y === 'number') {
-      const currentY = scrollOffsetRef.current;
-      const newY = Math.max(0, currentY + offset.y);
-      scrollViewRef.current?.scrollTo({ y: newY, animated: false });
-    }
-  }, []);
+  const {
+    scrollViewRef,
+    scrollOffsetY,
+    propagateSwipe,
+    scrollTo,
+    onScroll,
+  } = useModalSwipeScroll(SWIPE_HEADER_HEIGHT, visible);
 
   useEffect(() => {
     if (preferencias) {
@@ -118,12 +102,7 @@ export function NotificacionesSheet({
             decelerationRate="fast"
             keyboardShouldPersistTaps="handled"
             overScrollMode="never"
-            onScroll={(e) => {
-              const currentOffset = e.nativeEvent.contentOffset.y;
-              const y = currentOffset < 0 ? 0 : currentOffset;
-              setScrollOffsetY(y);
-              scrollOffsetRef.current = y;
-            }}
+            onScroll={onScroll}
             scrollEventThrottle={16}
           >
             <Text style={styles.sheetLabel}>Telegram ID</Text>

@@ -1,9 +1,35 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { LayoutAnimation, Platform, UIManager } from 'react-native';
 import { supabase } from '../../../supabase';
+
+if (
+  Platform.OS === 'android'
+  && !global?.nativeFabricUIManager
+  && UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { useDeviceContext } from '../../hooks/useDeviceContext';
+import { useUserContext } from '../../context/UserContext';
 import { buildN8nPayload } from '../../utils/buildN8nPayload';
 
 const CHAT_ENDPOINT = 'https://untremulent-isoagglutinative-irving.ngrok-free.dev/webhook/chat';
+
+const PLAN_GENERADO_PHRASE = 'Tu primer plan de entrenamiento semanal ha sido generado';
+const ONBOARDING_COMPLETE_KEYWORDS = [
+  'perfil ha sido configurado',
+  'perfil configurado',
+  'plan de entrenamiento ha sido generado',
+  'plan generado',
+  'configuración completada',
+  'perfil completado',
+];
+
+function isOnboardingCompleteMessage(text) {
+  if (!text || typeof text !== 'string') return false;
+  const lower = text.toLowerCase();
+  return ONBOARDING_COMPLETE_KEYWORDS.some((kw) => lower.includes(kw));
+}
 
 function mapIntensityToColor(intensityHint) {
   switch (intensityHint) {
@@ -23,8 +49,9 @@ function mapIntensityToColor(intensityHint) {
   }
 }
 
-export function useXerpaAI(user) {
+export function useXerpaAI(user, onboardingParams, onOnboardingConsumed, initialContext) {
   const { location, pushToken } = useDeviceContext();
+  const { refreshUserData } = useUserContext();
   const [messages, setMessages] = useState([
     {
       id: '1',
@@ -37,6 +64,7 @@ export function useXerpaAI(user) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [rol, setRol] = useState('Atleta');
+  const onboardingSentRef = useRef(false);
 
   useEffect(() => {
     async function fetchRol() {
@@ -51,9 +79,12 @@ export function useXerpaAI(user) {
     fetchRol();
   }, [user?.id]);
 
-  const sendMessage = useCallback(async () => {
-    const text = input.trim();
+  const sendMessage = useCallback(async (overrideText, rolOverride) => {
+    const textToProcess = typeof overrideText === 'string' ? overrideText : input;
+    const text = (textToProcess ?? '').toString().trim();
     if (!text || !user?.id) return;
+
+    const effectiveRol = rolOverride ?? rol;
 
     const userMsg = {
       id: Date.now().toString(),
@@ -61,14 +92,14 @@ export function useXerpaAI(user) {
       role: 'user',
     };
     setMessages((prev) => [...prev, userMsg]);
-    setInput('');
+    if (typeof overrideText !== 'string') setInput('');
     setLoading(true);
 
     try {
       const body = buildN8nPayload({
         userId: user.id,
         mensaje: text,
-        rol,
+        rol: effectiveRol,
         location,
         pushToken,
         includeMessageAlias: true,
@@ -101,6 +132,11 @@ export function useXerpaAI(user) {
         borderColor: mapIntensityToColor(intensityHint),
       };
       setMessages((prev) => [...prev, aiMsg]);
+
+      if (answer.includes(PLAN_GENERADO_PHRASE) || isOnboardingCompleteMessage(answer) || metadata?.action === 'update_profile') {
+        await refreshUserData();
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      }
     } catch (err) {
       console.error('[Xerpa AI] Error:', err);
       const errorMsg = {
@@ -114,7 +150,22 @@ export function useXerpaAI(user) {
     } finally {
       setLoading(false);
     }
-  }, [input, user?.id, rol, location, pushToken]);
+  }, [input, user?.id, rol, location, pushToken, refreshUserData]);
+
+  useEffect(() => {
+    if (!onboardingParams?.isNewUser || !onboardingParams?.userRole || !user?.id || onboardingSentRef.current) return;
+    onboardingSentRef.current = true;
+    const rolLabel = onboardingParams.userRole === 'Tutor' ? 'Padre/Tutor' : onboardingParams.userRole;
+    const welcomeText = `Hola XERPA, soy un nuevo ${rolLabel}. Ayúdame a configurar mi perfil.`;
+    sendMessage(welcomeText, onboardingParams.userRole);
+    onOnboardingConsumed?.();
+  }, [onboardingParams?.isNewUser, onboardingParams?.userRole, user?.id, sendMessage]);
+
+  useEffect(() => {
+    if (initialContext && typeof initialContext === 'string') {
+      setInput(initialContext);
+    }
+  }, [initialContext]);
 
   return {
     messages,

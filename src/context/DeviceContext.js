@@ -14,20 +14,13 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
-import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
 import { supabase } from '../../supabase';
+import { registerForPushNotificationsAsync } from '../utils/PushNotifications';
 
-// ─── Configuración de canal (Android) ────────────────────────
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+const SIGNUP_ROLE_KEY = 'xerpa_signup_role';
+const ONBOARDING_KEY = 'xerpa_onboarding';
 
 // ─── Context ─────────────────────────────────────────────────
 const DeviceContext = createContext({
@@ -48,19 +41,35 @@ export function DeviceContextProvider({ children, user }) {
   useEffect(() => {
     if (!user?.id || initializedRef.current) return;
     initializedRef.current = true;
-    _init(user.id);
+    _init(user);
   }, [user?.id]);
 
   // ── Init paralelo ─────────────────────────────────────────
-  async function _init(userId) {
+  async function _init(userObj) {
+    const userId = userObj?.id;
     setLoading(true);
     setError(null);
     try {
+      // OAuth signup: persistimos rol en SignUp antes de abrir el browser
+      const signupRole = await AsyncStorage.getItem(SIGNUP_ROLE_KEY);
+      if (signupRole) {
+        await AsyncStorage.removeItem(SIGNUP_ROLE_KEY);
+        await supabase
+          .from('usuarios')
+          .upsert(
+            [{ id: userId, email: userObj?.email ?? null, rol: signupRole }],
+            { onConflict: 'id' }
+          );
+        await AsyncStorage.setItem(
+          ONBOARDING_KEY,
+          JSON.stringify({ isNewUser: true, userRole: signupRole })
+        );
+      }
+
       const [locationData, token] = await Promise.all([
         _requestLocation(),
         _requestPushToken(),
       ]);
-      // Sync silencioso — no bloquea la UI
       _syncToSupabase(userId, locationData, token);
     } catch (err) {
       setError(err?.message ?? 'Error al obtener permisos del dispositivo');
@@ -101,45 +110,7 @@ export function DeviceContextProvider({ children, user }) {
   // ── Push Notifications ────────────────────────────────────
   async function _requestPushToken() {
     try {
-      // Crear canal en Android
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('xerpa-default', {
-          name: 'XERPA Notificaciones',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#00F0FF',
-        });
-      }
-
-      // Verificar/solicitar permisos
-      const { status: existing } = await Notifications.getPermissionsAsync();
-      const finalStatus = existing !== 'granted'
-        ? (await Notifications.requestPermissionsAsync()).status
-        : existing;
-
-      if (finalStatus !== 'granted') return null;
-
-      // Intentar Expo Push Token primero (requiere EAS projectId en producción)
-      // En Expo Go/desarrollo funciona sin projectId
-      let token = null;
-      try {
-        const projectId =
-          Constants.expoConfig?.extra?.eas?.projectId ??
-          Constants.easConfig?.projectId ??
-          undefined;
-
-        const tokenData = await Notifications.getExpoPushTokenAsync(
-          projectId ? { projectId } : {}
-        );
-        token = tokenData.data;
-      } catch {
-        // Fallback: token nativo del dispositivo (formato APNs / FCM)
-        try {
-          const native = await Notifications.getDevicePushTokenAsync();
-          token = native.data ?? null;
-        } catch {}
-      }
-
+      const token = await registerForPushNotificationsAsync();
       if (token) setPushToken(token);
       return token;
     } catch {

@@ -187,6 +187,27 @@ export const perfilStyles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
+  biometriaProgressWrap: {
+    marginBottom: 10,
+  },
+  biometriaProgressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  biometriaProgressLabel: {
+    color: '#8E8E93',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  biometriaProgressValue: {
+    color: '#00D2FF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
   dashboardEditBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -216,7 +237,7 @@ export const perfilStyles = StyleSheet.create({
     backgroundColor: '#1A1A1A',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: theme.SHEET_PADDING_BOTTOM,
     borderTopWidth: 1,
@@ -856,7 +877,7 @@ export const perfilStyles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.85)',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 20,
   },
   updatingCard: {
     backgroundColor: '#1A1A1A',

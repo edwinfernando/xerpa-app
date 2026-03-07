@@ -1,53 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Alert } from 'react-native';
 import { supabase } from '../../../supabase';
+import { useToast } from '../../context/ToastContext';
 import { useDeviceContext } from '../../hooks/useDeviceContext';
 import { saveTodayPlan } from '../../services/offlineStorage';
 import { buildN8nPayload } from '../../utils/buildN8nPayload';
+import { getWeekBounds, generateWeekDays, groupByMonth } from '../../utils/dateUtils';
 
 // ⚠️ Reemplaza esta URL con tu endpoint de n8n
 const N8N_WEBHOOK_URL = 'https://untremulent-isoagglutinative-irving.ngrok-free.dev/webhook/chat';
 
-// ─── Helpers de fecha ────────────────────────────────────────
-export function getWeekBounds() {
-  const today = new Date();
-  const day = today.getDay(); // 0=Dom, 1=Lun…
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  return {
-    monday: monday.toISOString().split('T')[0],
-    sunday: sunday.toISOString().split('T')[0],
-    today: today.toISOString().split('T')[0],
-  };
-}
-
-export function generateWeekDays(mondayStr) {
-  const days = [];
-  const base = new Date(mondayStr + 'T00:00:00');
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(base);
-    d.setDate(base.getDate() + i);
-    days.push(d.toISOString().split('T')[0]);
-  }
-  return days;
-}
-
-export function groupByMonth(workouts) {
-  const groups = {};
-  workouts.forEach(w => {
-    const d = new Date(w.fecha + 'T00:00:00');
-    const key = d.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(w);
-  });
-  return Object.entries(groups).map(([month, items]) => ({ month, items }));
-}
-
-// ─── Hook ────────────────────────────────────────────────────
 export function usePlan(user) {
+  const { showToast } = useToast();
   const { location, pushToken } = useDeviceContext();
   const [loading, setLoading] = useState(true);
   const [weekWorkouts, setWeekWorkouts] = useState([]);
@@ -56,9 +19,9 @@ export function usePlan(user) {
 
   const { monday } = getWeekBounds();
 
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async ({ silent = false } = {}) => {
     if (!user?.id) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const { data, error } = await supabase
         .from('plan_entrenamientos')
@@ -93,11 +56,35 @@ export function usePlan(user) {
       setWeekWorkouts([]);
       setHistoryWorkouts([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [user?.id, monday]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    if (!user?.id) return;
+
+    fetchAll();
+
+    const planSubscription = supabase
+      .channel(`plan_realtime_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'plan_entrenamientos',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchAll({ silent: true });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(planSubscription);
+    };
+  }, [user?.id, fetchAll]);
 
   // Cache plan de hoy para uso offline (WorkoutActiveScreen)
   useEffect(() => {
@@ -133,9 +120,10 @@ export function usePlan(user) {
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
     if (authError || !authUser) throw new Error('Usuario no autenticado');
     const today = new Date().toISOString().split('T')[0];
+    const duracionMin = Math.max(0, Math.round((Number(duracion_seg) || 0) / 60));
     const { error } = await supabase
       .from('esfuerzo_manual')
-      .insert({ user_id: authUser.id, duracion_seg, rpe, fecha: today });
+      .insert({ user_id: authUser.id, duracion_min: duracionMin, rpe, fecha: today });
     if (error) throw error;
   };
 
@@ -208,12 +196,9 @@ export function usePlan(user) {
 
       // Refrescar datos desde Supabase
       await fetchAll();
-      Alert.alert('¡Listo! 🚀', '¡Plan generado con éxito! A darlo todo.');
+      showToast({ type: 'success', title: '¡Listo! 🚀', message: '¡Plan generado con éxito! A darlo todo.' });
     } catch (e) {
-      Alert.alert(
-        'Error de XERPA',
-        e?.message ?? 'Hubo un problema al generar el plan. Intenta de nuevo.'
-      );
+      showToast({ type: 'error', title: 'Error de XERPA', message: e?.message ?? 'Hubo un problema al generar el plan. Intenta de nuevo.' });
     } finally {
       setIsGenerating(false);
     }

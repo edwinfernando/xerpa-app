@@ -16,6 +16,7 @@ const WorkoutContext = createContext({
   timerSecs: 0,
   startTimer: () => {},
   stopTimer: () => {},
+  resumeTimer: () => {},
   resetTimer: () => {},
 });
 
@@ -39,9 +40,14 @@ export function WorkoutContextProvider({ children }) {
     setIsTimerActive(true);
   }
 
-  // Solo detiene — PlanView abre el sheet de finalización al recibirlo
+  // Solo detiene (pausa) — mantiene timerSecs
   function stopTimer() {
     setIsTimerActive(false);
+  }
+
+  // Reanuda sin resetear segundos
+  function resumeTimer() {
+    setIsTimerActive(true);
   }
 
   // Resetea segundos a 0 tras guardar/descartar la sesión
@@ -50,7 +56,7 @@ export function WorkoutContextProvider({ children }) {
   }
 
   return (
-    <WorkoutContext.Provider value={{ isTimerActive, timerSecs, startTimer, stopTimer, resetTimer }}>
+    <WorkoutContext.Provider value={{ isTimerActive, timerSecs, startTimer, stopTimer, resumeTimer, resetTimer }}>
       {children}
     </WorkoutContext.Provider>
   );

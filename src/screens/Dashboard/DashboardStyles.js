@@ -1,5 +1,7 @@
-import { StyleSheet } from 'react-native';
-import { theme } from '../../styles/theme';
+import { StyleSheet, Platform } from 'react-native';
+import { theme } from '../../theme/theme';
+
+const CARD_SHADOW = theme.shadow({ color: '#000', opacity: 0.12, radius: 10, elevation: 4 });
 
 export const dashboardStyles = StyleSheet.create({
   safeContainer: {
@@ -45,7 +47,88 @@ export const dashboardStyles = StyleSheet.create({
     opacity: 0.85,
   },
 
-  // ── Weather Banner ──────────────────────────────────────────
+  // ── HeroCoachCard (Centro de mando biométrico) ──────────────
+  heroCoachCard: {
+    backgroundColor: 'rgba(51, 51, 51, 0.8)',
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  heroLabel: {
+    color: '#888',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+  heroWeatherRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  heroLocationBtn: {
+    padding: 4,
+  },
+  heroWeatherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  heroWeatherText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  heroReadinessSection: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  heroReadinessRingWrap: {
+    position: 'relative',
+  },
+  heroReadinessRingCenter: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroReadinessNumber: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -2,
+  },
+  heroReadinessLabel: {
+    color: '#555',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginTop: 2,
+  },
+  heroMessageSection: {
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  heroMessageInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+  },
+  heroMessageText: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 20,
+    letterSpacing: -0.2,
+  },
+
+  // ── Weather Banner (legacy, por si se reutiliza) ─────────────
   weatherBanner: {
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 16,
@@ -56,20 +139,37 @@ export const dashboardStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    ...CARD_SHADOW,
   },
   weatherLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
+    minWidth: 0,
+  },
+  weatherTextContainer: {
+    flex: 1,
+    minWidth: 0,
   },
   weatherCity: {
-    color: '#ccc',
+    color: '#fff',
     fontSize: 14,
+    fontWeight: '700',
+  },
+  weatherCityLoading: {
+    color: '#888',
     fontWeight: '600',
   },
   weatherCondition: {
     color: '#555',
     fontSize: 12,
+    marginTop: 2,
+  },
+  weatherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     marginTop: 2,
   },
   weatherTemp: {
@@ -79,15 +179,19 @@ export const dashboardStyles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   weatherConnectBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    height: theme.BUTTON_HEIGHT,
+    minWidth: 100,
+    paddingHorizontal: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#00F0FF33',
+    borderColor: 'rgba(0,240,255,0.4)',
+    backgroundColor: 'rgba(0,240,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   weatherConnectText: {
     color: '#00F0FF',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
 
@@ -116,6 +220,7 @@ export const dashboardStyles = StyleSheet.create({
     borderColor: 'rgba(0,240,255,0.12)',
     padding: 24,
     alignItems: 'center',
+    ...CARD_SHADOW,
   },
   tssRingWrapper: {
     marginVertical: 8,
@@ -172,10 +277,11 @@ export const dashboardStyles = StyleSheet.create({
   misionGradient: {
     borderRadius: 24,
     padding: 2,
-    shadowColor: '#00F0FF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
+    ...Platform.select({
+      ios: { shadowColor: '#00F0FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 16 },
+      android: { elevation: 8 },
+      default: {},
+    }),
   },
   misionInner: {
     backgroundColor: '#111',
@@ -281,7 +387,7 @@ export const dashboardStyles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(0,240,255,0.15)',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 18,
     flexDirection: 'row',
     alignItems: 'center',
@@ -333,63 +439,128 @@ export const dashboardStyles = StyleSheet.create({
     opacity: 0.7,
   },
 
-  // ── Quick Actions ───────────────────────────────────────────
-  quickActionsSection: {
-    gap: 10,
+  // ── Quick Actions (iconos circulares compactos) ──────────────
+  quickActionsCompact: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 40,
   },
-  quickActionsTitle: {
+  quickActionCircle: {
+    alignItems: 'center',
+  },
+  quickActionCircleInner: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickActionLabel: {
+    fontSize: 10,
+    color: '#8E8E93',
+    marginTop: 6,
+    fontWeight: '600',
+  },
+
+  // ── TelemetryCarousel ───────────────────────────────────────
+  telemetryCarouselContent: {
+    paddingRight: theme.spacing.screenPadding,
+    paddingVertical: 4,
+  },
+  telemetryCard: {
+    width: 280,
+    height: 160,
+    marginRight: 16,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0,240,255,0.12)',
+    padding: 16,
+  },
+  telemetryCardLabel: {
     color: '#444',
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 2,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
-    marginBottom: 4,
+    marginBottom: 12,
   },
-  quickActionsRow: {
+  telemetryTssRow: {
     flexDirection: 'row',
-    gap: 10,
-  },
-  quickActionCard: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
-    paddingVertical: 16,
-    paddingHorizontal: 8,
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    flex: 1,
   },
-  quickActionCardDanger: {
-    borderColor: 'rgba(255,82,82,0.25)',
-    backgroundColor: 'rgba(255,82,82,0.05)',
+  telemetryTssRingWrap: {
+    position: 'relative',
   },
-  quickActionCardAI: {
-    borderColor: 'rgba(0,240,255,0.25)',
-    backgroundColor: 'rgba(0,240,255,0.05)',
+  telemetryProgressWrap: {
+    marginTop: 10,
   },
-  quickActionCardSync: {
-    borderColor: 'rgba(57,255,20,0.2)',
-    backgroundColor: 'rgba(57,255,20,0.04)',
+  telemetryTssRingCenter: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  quickActionText: {
-    color: '#888',
-    fontSize: 11,
-    fontWeight: '700',
-    textAlign: 'center',
-    letterSpacing: 0.3,
+  telemetryTssPct: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '900',
   },
-  quickActionTextDanger: {
-    color: '#ff5252',
+  telemetryTssNumbers: {
+    flex: 1,
+    alignItems: 'flex-end',
+    marginLeft: 12,
   },
-  quickActionTextAI: {
+  telemetryTssActual: {
     color: '#00F0FF',
+    fontSize: 24,
+    fontWeight: '800',
   },
-  quickActionTextSync: {
-    color: '#39FF14',
+  telemetryTssDivider: {
+    color: '#444',
+    fontSize: 14,
+  },
+  telemetryTssPlanned: {
+    color: '#555',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  telemetryMetricsGrid: {
+    flexDirection: 'row',
+    flex: 1,
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  telemetryMetricItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  telemetryMetricValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  telemetryMetricCtl: { color: '#39FF14' },
+  telemetryMetricAtl: { color: '#00F0FF' },
+  telemetryMetricTsb: { color: '#ff9800' },
+  telemetryMetricLabel: {
+    color: '#666',
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  telemetryMetricSublabel: {
+    color: '#333',
+    fontSize: 9,
+    marginTop: 2,
   },
 
-  // ── Quick Metrics ───────────────────────────────────────────
+  // ── Quick Metrics (legacy, usado en TelemetryCarousel) ───────
   quickMetricsRow: {
     flexDirection: 'row',
     gap: 10,
@@ -485,10 +656,11 @@ export const dashboardStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(57,255,20,0.3)',
     alignItems: 'center',
-    shadowColor: '#39FF14',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    ...Platform.select({
+      ios: { shadowColor: '#39FF14', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 12 },
+      android: { elevation: 6 },
+      default: {},
+    }),
   },
   rpeSuccessText: {
     color: '#39FF14',

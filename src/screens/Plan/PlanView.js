@@ -1,16 +1,14 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   Animated,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
   LayoutAnimation,
+  StyleSheet,
 } from 'react-native';
+import { useToast } from '../../context/ToastContext';
 import Modal from 'react-native-modal';
 import { ScreenWrapper } from '../../components/ScreenWrapper';
 import { CollapsibleHeader } from '../../components/CollapsibleHeader';
@@ -21,10 +19,14 @@ import { useWorkoutContext } from '../../context/WorkoutContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { Plus, Sparkles, History } from 'lucide-react-native';
+import { Plus, Sparkles, History, Calendar } from 'lucide-react-native';
 import { AnimatedActionButton } from '../../components/ui/AnimatedActionButton';
 import { useNavigationBarColor } from '../../hooks/useNavigationBarColor';
-import { getWeekBounds, generateWeekDays, groupByMonth } from './usePlan';
+import { getWeekBounds, generateWeekDays, groupByMonth } from '../../utils/dateUtils';
+import { formatDuracion } from '../../utils/formatDuracion';
+import { getTypeConfig } from '../../utils/workoutTypeConfig';
+import { useModalSwipeScroll } from '../../hooks/useModalSwipeScroll';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 // ─────────────────────────────────────────────────────────────
 // Constantes
@@ -34,7 +36,32 @@ const DAY_NAMES = {
   4: 'Jueves', 5: 'Viernes', 6: 'Sábado',
 };
 const MONTH_ABBR = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-const TIPO_OPTIONS = ['Ride', 'Run', 'Strength', 'Rest', 'Walk', 'Other'];
+const FIXED_SEGMENTS_HEIGHT = 68;
+
+const fixedBarStyles = StyleSheet.create({
+  fixedBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  background: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#121212',
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 10,
+  },
+  segmentedRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  segmentedBtnHalf: {
+    flex: 1,
+  },
+});
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
@@ -48,28 +75,6 @@ function formatMonthYear(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   const formatted = d.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
-}
-
-function formatDuracion(min) {
-  if (!min) return null;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return h > 0 ? `${h}h ${m > 0 ? m + 'm' : ''}`.trim() : `${m} min`;
-}
-
-function getTypeConfig(tipo) {
-  const t = (tipo ?? '').toLowerCase();
-  if (t.includes('ride') || t.includes('bici') || t.includes('mtb') || t.includes('cicl'))
-    return { icon: 'bike', color: '#00F0FF' };
-  if (t.includes('run') || t.includes('corr') || t.includes('trail') || t.includes('carrera'))
-    return { icon: 'run', color: '#39FF14' };
-  if (t.includes('strength') || t.includes('fuerza') || t.includes('gym') || t.includes('pesa') || t.includes('peso'))
-    return { icon: 'dumbbell', color: '#ff9800' };
-  if (t.includes('recov') || t.includes('recuper') || t.includes('rest') || t.includes('descan'))
-    return { icon: 'heart-pulse', color: '#ff5252' };
-  if (t.includes('swim') || t.includes('nat'))
-    return { icon: 'swim', color: '#7C4DFF' };
-  return { icon: 'lightning-bolt', color: '#ffca28' };
 }
 
 function formatTimer(secs) {
@@ -104,32 +109,17 @@ const RPE_LABELS = {
 // ─────────────────────────────────────────────────────────────
 const SWIPE_HEADER_HEIGHT = 120;
 
-function WorkoutDetailSheet({ visible, workout, dateStr, onClose, onSaveFeedback, styles }) {
+function WorkoutDetailSheet({ visible, workout, dateStr, onClose, onSaveFeedback, showToast, styles }) {
   const [completing, setCompleting] = useState(false);
   const [notaAtleta, setNotaAtleta] = useState('');
-  const [scrollOffsetY, setScrollOffsetY] = useState(0);
-  const scrollViewRef = useRef(null);
-  const scrollOffsetRef = useRef(0);
 
-  useEffect(() => {
-    if (visible) {
-      setScrollOffsetY(0);
-      scrollOffsetRef.current = 0;
-    }
-  }, [visible]);
-
-  const propagateSwipe = useCallback((evt) => {
-    const locationY = evt?.nativeEvent?.locationY ?? 0;
-    return locationY > SWIPE_HEADER_HEIGHT;
-  }, []);
-
-  const scrollTo = useCallback((offset) => {
-    if (offset && typeof offset.y === 'number') {
-      const currentY = scrollOffsetRef.current;
-      const newY = Math.max(0, currentY + offset.y);
-      scrollViewRef.current?.scrollTo({ y: newY, animated: false });
-    }
-  }, []);
+  const {
+    scrollViewRef,
+    scrollOffsetY,
+    propagateSwipe,
+    scrollTo,
+    onScroll,
+  } = useModalSwipeScroll(SWIPE_HEADER_HEIGHT, visible);
 
   if (!workout) return null;
 
@@ -148,7 +138,7 @@ function WorkoutDetailSheet({ visible, workout, dateStr, onClose, onSaveFeedback
       await onSaveFeedback(workout.id, notaAtleta);
       onClose();
     } catch (e) {
-      Alert.alert('Error de XERPA', e?.message ?? 'No se pudo guardar el feedback.');
+      showToast?.({ type: 'error', title: 'Error de XERPA', message: e?.message ?? 'No se pudo guardar el feedback.' });
     } finally {
       setCompleting(false);
     }
@@ -182,12 +172,7 @@ function WorkoutDetailSheet({ visible, workout, dateStr, onClose, onSaveFeedback
           decelerationRate="fast"
           keyboardShouldPersistTaps="handled"
           overScrollMode="never"
-          onScroll={(e) => {
-            const currentOffset = e.nativeEvent.contentOffset.y;
-            const y = currentOffset < 0 ? 0 : currentOffset;
-            setScrollOffsetY(y);
-            scrollOffsetRef.current = y;
-          }}
+          onScroll={onScroll}
           scrollEventThrottle={16}
         >
           {/* Icono grande + pill tipo */}
@@ -571,218 +556,6 @@ function FutureCard({ dateStr, workout, onPress, styles }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Modal: Añadir Entrenamiento Manual
-// ─────────────────────────────────────────────────────────────
-function AddManualModal({ visible, onClose, onSave, styles }) {
-  const todayStr = new Date().toISOString().split('T')[0];
-  const [titulo, setTitulo] = useState('');
-  const [fecha, setFecha] = useState(todayStr);
-  const [tipo, setTipo] = useState('Ride');
-  const [duracion, setDuracion] = useState('');
-  const [tss, setTss] = useState('');
-  const [hora, setHora] = useState('');
-  const [punto_encuentro, setPuntoEncuentro] = useState('');
-  const [detalle, setDetalle] = useState('');
-  const [tituloError, setTituloError] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [scrollOffsetY, setScrollOffsetY] = useState(0);
-  const scrollViewRef = useRef(null);
-  const scrollOffsetRef = useRef(0);
-
-  useEffect(() => {
-    if (visible) {
-      setScrollOffsetY(0);
-      scrollOffsetRef.current = 0;
-    }
-  }, [visible]);
-
-  const SWIPE_HEADER_HEIGHT = 95;
-  const propagateSwipe = useCallback((evt) => {
-    const locationY = evt?.nativeEvent?.locationY ?? 0;
-    return locationY > SWIPE_HEADER_HEIGHT;
-  }, []);
-
-  const scrollTo = useCallback((offset) => {
-    if (offset && typeof offset.y === 'number') {
-      const currentY = scrollOffsetRef.current;
-      const newY = Math.max(0, currentY + offset.y);
-      scrollViewRef.current?.scrollTo({ y: newY, animated: false });
-    }
-  }, []);
-
-  const resetForm = () => {
-    setTitulo('');
-    setFecha(todayStr);
-    setTipo('Ride');
-    setDuracion('');
-    setTss('');
-    setHora('');
-    setPuntoEncuentro('');
-    setDetalle('');
-    setTituloError('');
-  };
-
-  const handleClose = () => { resetForm(); onClose(); };
-
-  const handleSave = async () => {
-    if (!titulo.trim()) { setTituloError('El título es obligatorio.'); return; }
-    setSaving(true);
-    try {
-      await onSave({ titulo: titulo.trim(), fecha, tipo, duracion_min: duracion, tss_plan: tss, hora: hora.trim(), punto_encuentro: punto_encuentro.trim(), detalle });
-      resetForm();
-      onClose();
-      Alert.alert('¡Listo! 💪', 'Entrenamiento añadido al plan.');
-    } catch (e) {
-      Alert.alert('Error de XERPA', e?.message ?? 'No se pudo guardar el entrenamiento. Intenta de nuevo.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal
-      isVisible={visible}
-      onBackdropPress={handleClose}
-      onBackButtonPress={handleClose}
-      onSwipeComplete={handleClose}
-      swipeDirection={scrollOffsetY <= 0 ? ['down'] : undefined}
-      propagateSwipe={propagateSwipe}
-      scrollTo={scrollTo}
-      scrollOffset={scrollOffsetY}
-      scrollOffsetMax={0}
-      animationIn="slideInUp"
-      animationOut="slideOutDown"
-      style={{ margin: 0, justifyContent: 'flex-end' }}
-    >
-      <KeyboardAvoidingView
-        style={styles.manualModalOverlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={handleClose} />
-        <View style={styles.manualModalSheet}>
-          <View style={styles.manualModalHandle} />
-          <Text style={styles.manualModalTitle}>Añadir Entrenamiento</Text>
-
-          <ScrollView
-            ref={scrollViewRef}
-            showsVerticalScrollIndicator={false}
-            bounces={false}
-            decelerationRate="fast"
-            keyboardShouldPersistTaps="handled"
-            overScrollMode="never"
-            onScroll={(e) => {
-              const currentOffset = e.nativeEvent.contentOffset.y;
-              const y = currentOffset < 0 ? 0 : currentOffset;
-              setScrollOffsetY(y);
-              scrollOffsetRef.current = y;
-            }}
-            scrollEventThrottle={16}
-          >
-            <Text style={styles.manualLabel}>Título *</Text>
-            <Input
-              value={titulo}
-              onChangeText={(t) => { setTitulo(t); if (tituloError) setTituloError(''); }}
-              placeholder="Ej. Rodada zona 2 + fartlek"
-              error={!!tituloError}
-              errorText={tituloError}
-              style={{ marginBottom: 16 }}
-            />
-
-            <Text style={styles.manualLabel}>Tipo</Text>
-            <View style={styles.tipoPills}>
-              {TIPO_OPTIONS.map(t => (
-                <TouchableOpacity
-                  key={t}
-                  style={[styles.tipoPill, tipo === t && styles.tipoPillActive]}
-                  onPress={() => setTipo(t)}
-                >
-                  <Text style={[styles.tipoPillText, tipo === t && styles.tipoPillTextActive]}>{t}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.manualLabel}>Fecha</Text>
-            <Input
-              value={fecha}
-              onChangeText={setFecha}
-              placeholder="AAAA-MM-DD"
-              keyboardType="numbers-and-punctuation"
-              style={{ marginBottom: 16 }}
-            />
-
-            <View style={styles.manualRow}>
-              <View style={styles.manualRowItem}>
-                <Text style={styles.manualLabel}>Hora</Text>
-                <Input
-                  value={hora}
-                  onChangeText={setHora}
-                  placeholder="08:00"
-                  keyboardType="numbers-and-punctuation"
-                  style={{ marginBottom: 16 }}
-                />
-              </View>
-              <View style={styles.manualRowItem}>
-                <Text style={styles.manualLabel}>Punto de encuentro</Text>
-                <Input
-                  value={punto_encuentro}
-                  onChangeText={setPuntoEncuentro}
-                  placeholder="Ej. Parque Central"
-                  style={{ marginBottom: 16 }}
-                />
-              </View>
-            </View>
-
-            <View style={styles.manualRow}>
-              <View style={styles.manualRowItem}>
-                <Text style={styles.manualLabel}>Duración (min)</Text>
-                <Input
-                  value={duracion}
-                  onChangeText={setDuracion}
-                  placeholder="90"
-                  keyboardType="numeric"
-                  style={{ marginBottom: 16 }}
-                />
-              </View>
-              <View style={styles.manualRowItem}>
-                <Text style={styles.manualLabel}>TSS</Text>
-                <Input
-                  value={tss}
-                  onChangeText={setTss}
-                  placeholder="80"
-                  keyboardType="numeric"
-                  style={{ marginBottom: 16 }}
-                />
-              </View>
-            </View>
-
-            <Text style={styles.manualLabel}>Notas / Detalle</Text>
-            <Input
-              value={detalle}
-              onChangeText={setDetalle}
-              placeholder="Descripción del entrenamiento..."
-              multiline
-              numberOfLines={3}
-              style={{ marginBottom: 16 }}
-            />
-
-            <View style={styles.manualActions}>
-              <Button
-                title="Guardar Entreno"
-                variant="solid"
-                onPress={handleSave}
-                loading={saving}
-                disabled={saving}
-                style={[styles.manualSaveBtn, { flex: 1 }]}
-              />
-            </View>
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
 // Generating Overlay
 // ─────────────────────────────────────────────────────────────
 function GeneratingOverlay({ visible, styles }) {
@@ -790,7 +563,11 @@ function GeneratingOverlay({ visible, styles }) {
     <Modal isVisible={visible} animationIn="fadeIn" animationOut="fadeOut">
       <View style={styles.generatingOverlay}>
         <View style={styles.generatingCard}>
-          <ActivityIndicator size="large" color="#00F0FF" style={{ marginBottom: 20 }} />
+          <View style={styles.generatingSkeletons}>
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} height={56} borderRadius={18} style={styles.generatingSkeletonCard} />
+            ))}
+          </View>
           <Text style={styles.generatingTitle}>Creando tu plan...</Text>
           <Text style={styles.generatingText}>
             XERPA está analizando tu perfil y creando tu semana perfecta...
@@ -805,9 +582,10 @@ function GeneratingOverlay({ visible, styles }) {
 // ─────────────────────────────────────────────────────────────
 // TimerFinishSheet — Sheet de finalización con RPE
 // ─────────────────────────────────────────────────────────────
-function TimerFinishSheet({ visible, totalSecs, onClose, onSave, styles }) {
+function TimerFinishSheet({ visible, totalSecs, onClose, onSave, showToast, styles }) {
   const [rpe, setRpe] = useState(5);
   const [saving, setSaving] = useState(false);
+  const { scrollOffsetY } = useModalSwipeScroll(110, visible);
 
   useEffect(() => {
     if (visible) setRpe(5);
@@ -818,9 +596,9 @@ function TimerFinishSheet({ visible, totalSecs, onClose, onSave, styles }) {
     try {
       await onSave({ duracion_seg: totalSecs, rpe });
       onClose();
-      Alert.alert('¡Sesión guardada! 💪', 'Tu actividad fue registrada en el diario.');
+      showToast?.({ type: 'success', title: '¡Sesión guardada! 💪', message: 'Tu actividad fue registrada en el diario.' });
     } catch (e) {
-      Alert.alert('Error de XERPA', e?.message ?? 'No se pudo guardar la sesión. Intenta de nuevo.');
+      showToast?.({ type: 'error', title: 'Error de XERPA', message: e?.message ?? 'No se pudo guardar la sesión. Intenta de nuevo.' });
     } finally {
       setSaving(false);
     }
@@ -832,7 +610,7 @@ function TimerFinishSheet({ visible, totalSecs, onClose, onSave, styles }) {
       onBackdropPress={onClose}
       onBackButtonPress={onClose}
       onSwipeComplete={onClose}
-      swipeDirection={['down']}
+      swipeDirection={scrollOffsetY <= 0 ? ['down'] : undefined}
       propagateSwipe={true}
       animationIn="slideInUp"
       animationOut="slideOutDown"
@@ -922,7 +700,7 @@ function EmptyPlanState({ onGeneratePlan, isGenerating, styles }) {
         activeOpacity={0.85}
       >
         {isGenerating ? (
-          <ActivityIndicator size="small" color="#000000" />
+          <Skeleton width={24} height={24} borderRadius={12} />
         ) : (
           <Text style={styles.emptyPlanButtonText}>Generar Plan con XERPA AI</Text>
         )}
@@ -1115,11 +893,12 @@ export function PlanView({
   handleGeneratePlan,
   addManualWorkout,
   saveTimerSession,
+  onOpenAddPlan,
   styles,
 }) {
+  const { showToast } = useToast();
   const scrollViewRef = useRef(null);
   const [activeTab, setActiveTab] = useState('week');
-  const [isManualModalVisible, setIsManualModalVisible] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState(null);
   const [selectedDateStr, setSelectedDateStr] = useState('');
 
@@ -1132,7 +911,7 @@ export function PlanView({
   const headerDateLabel = formatMonthYear(monday);
   const { scrollHandler, HEADER_MAX_HEIGHT, interpolations, insets } = useCollapsibleHeader({ compact: true });
 
-  const isAnyModalVisible = !!selectedWorkout || isManualModalVisible || isGenerating || showFinishSheet;
+  const isAnyModalVisible = !!selectedWorkout || isGenerating || showFinishSheet;
   useNavigationBarColor(isAnyModalVisible, '#131313', '#121212');
 
   function openDetail(workout, dateStr) {
@@ -1168,9 +947,15 @@ export function PlanView({
   if (loading) {
     return (
       <ScreenWrapper style={styles.safeContainer}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#00F0FF" />
-          <Text style={styles.loadingText}>Cargando plan…</Text>
+        <View style={styles.skeletonWrap}>
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton
+              key={i}
+              height={72}
+              borderRadius={18}
+              style={styles.skeletonCard}
+            />
+          ))}
         </View>
       </ScreenWrapper>
     );
@@ -1186,87 +971,97 @@ export function PlanView({
           <AnimatedActionButton
             label="Añadir"
             icon={<Plus color="#00D2FF" size={20} strokeWidth={2.5} />}
-            onPress={() => setIsManualModalVisible(true)}
+            onPress={onOpenAddPlan}
             interpolations={interpolations}
           />
         }
         interpolations={interpolations}
         insets={insets}
       />
-      <Animated.ScrollView
-        ref={scrollViewRef}
-        bounces={false}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingTop: HEADER_MAX_HEIGHT }]}
-        onScroll={scrollHandler}
-        scrollEventThrottle={16}
-      >
-        {/* Segmented Control — glassmorphism + Azul Neón (scroll horizontal) */}
-        <View style={styles.segmented}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.segmentedScrollContent}
-            style={styles.segmentedScrollView}
-          >
+      <View style={{ flex: 1 }}>
+        <Animated.ScrollView
+          ref={scrollViewRef}
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: HEADER_MAX_HEIGHT + FIXED_SEGMENTS_HEIGHT }]}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+        >
+          {/* Contenido según tab */}
+          {activeTab === 'week' ? (
+            <WeekTab
+              weekWorkouts={weekWorkouts}
+              onGeneratePlan={handleGeneratePlan}
+              isGenerating={isGenerating}
+              onOpenDetail={openDetail}
+              onStopTimer={stopTimer}
+              onTodayCardLayout={handleTodayCardLayout}
+              styles={styles}
+            />
+          ) : (
+            <HistoryTab
+              historyWorkouts={historyWorkouts}
+              onOpenDetail={openDetail}
+              onGoToWeek={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setActiveTab('week');
+              }}
+              styles={styles}
+            />
+          )}
+        </Animated.ScrollView>
+
+        <Animated.View
+          style={[
+            fixedBarStyles.fixedBar,
+            { top: interpolations.headerHeight },
+          ]}
+          pointerEvents="box-none"
+        >
+          <View style={fixedBarStyles.background} pointerEvents="none" />
+          <View style={fixedBarStyles.content}>
+            <View style={[styles.segmented, { marginTop: 0, marginBottom: 0 }]}>
+              <View style={fixedBarStyles.segmentedRow}>
             <TouchableOpacity
-              style={[styles.segmentedBtn, activeTab === 'week' && styles.segmentedBtnActive]}
+              style={[
+                styles.segmentedBtn,
+                fixedBarStyles.segmentedBtnHalf,
+                activeTab === 'week' && styles.segmentedBtnActive,
+              ]}
               onPress={() => {
                 LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                 setActiveTab('week');
               }}
             >
+              <Calendar color={activeTab === 'week' ? '#00D2FF' : '#8E8E93'} size={16} />
               <Text style={[styles.segmentedText, activeTab === 'week' && styles.segmentedTextActive]}>
                 Semana Actual
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.segmentedBtn, activeTab === 'history' && styles.segmentedBtnActive]}
+              style={[
+                styles.segmentedBtn,
+                fixedBarStyles.segmentedBtnHalf,
+                activeTab === 'history' && styles.segmentedBtnActive,
+              ]}
               onPress={() => {
                 LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                 setActiveTab('history');
               }}
             >
+              <History color={activeTab === 'history' ? '#00D2FF' : '#8E8E93'} size={16} />
               <Text style={[styles.segmentedText, activeTab === 'history' && styles.segmentedTextActive]}>
                 Historial
               </Text>
             </TouchableOpacity>
-          </ScrollView>
-        </View>
-
-        {/* Contenido según tab */}
-        {activeTab === 'week' ? (
-          <WeekTab
-            weekWorkouts={weekWorkouts}
-            onGeneratePlan={handleGeneratePlan}
-            isGenerating={isGenerating}
-            onOpenDetail={openDetail}
-            onStopTimer={stopTimer}
-            onTodayCardLayout={handleTodayCardLayout}
-            styles={styles}
-          />
-        ) : (
-          <HistoryTab
-            historyWorkouts={historyWorkouts}
-            onOpenDetail={openDetail}
-            onGoToWeek={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-              setActiveTab('week');
-            }}
-            styles={styles}
-          />
-        )}
-      </Animated.ScrollView>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+      </View>
 
       {/* Modals / Overlays */}
       <GeneratingOverlay visible={isGenerating} styles={styles} />
-
-      <AddManualModal
-        visible={isManualModalVisible}
-        onClose={() => setIsManualModalVisible(false)}
-        onSave={addManualWorkout}
-        styles={styles}
-      />
 
       <WorkoutDetailSheet
         visible={!!selectedWorkout}
@@ -1274,6 +1069,7 @@ export function PlanView({
         dateStr={selectedDateStr}
         onClose={closeDetail}
         onSaveFeedback={saveFeedback}
+        showToast={showToast}
         styles={styles}
       />
 
@@ -1282,6 +1078,7 @@ export function PlanView({
         totalSecs={timerSecs}
         onClose={handleFinishClose}
         onSave={saveTimerSession}
+        showToast={showToast}
         styles={styles}
       />
     </ScreenWrapper>

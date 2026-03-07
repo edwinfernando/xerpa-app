@@ -106,23 +106,37 @@ N8N_CHAT_ENDPOINT=https://tu-subdominio.ngrok-free.app/webhook/chat
 En tu proyecto de Supabase, ejecuta el siguiente SQL para crear la estructura base:
 
 ```sql
--- Tabla de usuarios
+-- Tabla de usuarios (sin entrenador_id; relaciones en tabla separada)
 CREATE TABLE usuarios (
   id UUID REFERENCES auth.users(id) PRIMARY KEY,
   nombre TEXT,
   email TEXT,
   rol TEXT CHECK (rol IN ('Atleta', 'Entrenador', 'Tutor')) DEFAULT 'Atleta',
   codigo_vinculacion TEXT UNIQUE,
-  entrenador_id UUID REFERENCES usuarios(id),
   created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Tabla relacional atleta-entrenador/tutor
+CREATE TABLE relaciones_usuarios (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  atleta_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  vinculado_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  tipo_vinculo TEXT NOT NULL CHECK (tipo_vinculo IN ('Entrenador', 'Tutor')),
+  parentesco TEXT,
+  estado TEXT NOT NULL DEFAULT 'Pendiente' CHECK (estado IN ('Activo', 'Inactivo', 'Pendiente')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(atleta_id, vinculado_id)
 );
 
 -- Habilitar Row Level Security
 ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;
+ALTER TABLE relaciones_usuarios ENABLE ROW LEVEL SECURITY;
 
 -- Política: cada usuario solo puede leer y editar su propio perfil
 CREATE POLICY "Acceso propio" ON usuarios
   FOR ALL USING (auth.uid() = id);
+
+-- Ver supabase/migrations/ para políticas de relaciones_usuarios.
 ```
 
 ### 5. Levantar n8n (Docker)
@@ -168,10 +182,21 @@ La base de datos principal reside en **Supabase (PostgreSQL)** y está protegida
 | `email` | `TEXT` | Correo electrónico |
 | `rol` | `TEXT` | `Atleta`, `Entrenador` o `Tutor` |
 | `codigo_vinculacion` | `TEXT` | Código único para vincular atletas con su entrenador/tutor |
-| `entrenador_id` | `UUID` | Referencia al entrenador asignado (FK a `usuarios`) |
 | `created_at` | `TIMESTAMPTZ` | Fecha de registro |
 
-> El sistema de **códigos de vinculación** permite que un Entrenador o Tutor comparta su código único con sus atletas para establecer la relación dentro de la plataforma.
+### Tabla `relaciones_usuarios`
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `id` | `UUID` | Clave primaria |
+| `atleta_id` | `UUID` | FK a `usuarios` (el atleta) |
+| `vinculado_id` | `UUID` | FK a `usuarios` (entrenador o tutor) |
+| `tipo_vinculo` | `TEXT` | `Entrenador` o `Tutor` |
+| `parentesco` | `TEXT` | Opcional (ej. Padre, Madre) |
+| `estado` | `TEXT` | `Activo`, `Inactivo` o `Pendiente` |
+| `created_at` | `TIMESTAMPTZ` | Fecha de creación |
+
+> El sistema de **códigos de vinculación** permite que un Entrenador o Tutor comparta su código único con sus atletas. Al ingresar el código, se crea un registro en `relaciones_usuarios` con estado `Pendiente`.
 
 ---
 

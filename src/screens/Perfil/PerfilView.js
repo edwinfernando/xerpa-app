@@ -1,35 +1,124 @@
-import React, { useState } from 'react';
+/**
+ * PerfilView — Dashboard de Identidad Estático con edición modular vía BottomSheets
+ *
+ * Arquitectura:
+ * 1. Hero: Avatar circular, Nombre, Email, botón Editar → BiometriaSheet
+ * 2. Social ID Card: ID XERPA (estilo tarjeta crédito/licencia) → Copiar/Compartir
+ * 3. Cards estáticas: Biometría, Notificaciones, Contactos, Integraciones, Entrenador
+ * 4. BottomSheets: BiometriaSheet, NotificacionesSheet (preferencias_notificaciones)
+ * Toda data de notificaciones viene de profileData.preferencias (no usuarios).
+ */
+import React from 'react';
 import {
   View,
   Text,
-  TextInput,
+  Animated,
   TouchableOpacity,
-  ScrollView,
-  Modal,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import Modal from 'react-native-modal';
 import { ScreenWrapper } from '../../components/ScreenWrapper';
-import { LinearGradient } from 'expo-linear-gradient';
-import { LogOut, ExternalLink, ShieldCheck, Eye, EyeOff } from 'lucide-react-native';
-import { ROL_OPTIONS } from './PerfilStyles';
+import { CollapsibleHeader } from '../../components/CollapsibleHeader';
+import { useCollapsibleHeader } from '../../hooks/useCollapsibleHeader';
+import { Ionicons } from '@expo/vector-icons';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { LogOut, Eye, EyeOff, ShieldCheck } from 'lucide-react-native';
+import { AnimatedActionButton } from '../../components/ui/AnimatedActionButton';
+import { UserIdCard } from './sections/UserIdCard';
+import { BiometriaDashboardCard } from './sections/BiometriaDashboardCard';
+import { NotificacionesDashboardCard } from './sections/NotificacionesDashboardCard';
+import { ContactosEmergenciaSection } from './sections/ContactosEmergenciaSection';
+import { IntegracionesSection } from './sections/IntegracionesSection';
+import { EntrenadorSection } from './sections/EntrenadorSection';
+import { BiometriaSheet } from './sheets/BiometriaSheet';
+import { NotificacionesSheet } from './sheets/NotificacionesSheet';
+import { useNavigationBarColor } from '../../hooks/useNavigationBarColor';
+import { useModalSwipeScroll } from '../../hooks/useModalSwipeScroll';
 
 // ─────────────────────────────────────────────────────────────
-// Saving Perfil Progress Overlay
+// Intervals.icu Integration Sheet
 // ─────────────────────────────────────────────────────────────
-function SavingPerfilOverlay({ visible, styles }) {
+function IntervalsSheet({
+  visible,
+  onClose,
+  idExterno,
+  setIdExterno,
+  apiKeyIntervalos,
+  setApiKeyIntervalos,
+  error,
+  isSaving,
+  onSave,
+  styles,
+}) {
+  const { scrollOffsetY } = useModalSwipeScroll(110, visible);
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.updatingOverlay}>
-        <View style={styles.updatingCard}>
-          <ActivityIndicator size="large" color="#00F0FF" style={{ marginBottom: 20 }} />
-          <Text style={styles.updatingTitle}>Sincronizando perfil...</Text>
-          <Text style={styles.updatingText}>
-            Sincronizando tus datos con XERPA... 🚀
+    <Modal
+      isVisible={visible}
+      onBackdropPress={onClose}
+      onBackButtonPress={onClose}
+      onSwipeComplete={onClose}
+      swipeDirection={scrollOffsetY <= 0 ? ['down'] : undefined}
+      propagateSwipe={true}
+      animationIn="slideInUp"
+      animationOut="slideOutDown"
+      style={{ margin: 0, justifyContent: 'flex-end' }}
+    >
+      <KeyboardAvoidingView
+        style={styles.pwSheetOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+        <View style={styles.pwSheet}>
+          <View style={styles.pwSheetHandle} />
+          <Text style={styles.pwSheetTitle}>Vincular Intervals.icu</Text>
+          <Text style={styles.pwSheetSubtitle}>
+            Ingresa tu ID de atleta y API Key para sincronizar datos.
           </Text>
+
+          <Text style={styles.pwLabel}>ID de atleta (Athlete ID)</Text>
+          <Input
+            value={idExterno}
+            onChangeText={setIdExterno}
+            placeholder="Ej: 12345"
+            keyboardType="numeric"
+            autoCapitalize="none"
+            style={{ marginBottom: 16 }}
+          />
+
+          <Text style={styles.pwLabel}>API Key</Text>
+          <Input
+            value={apiKeyIntervalos}
+            onChangeText={setApiKeyIntervalos}
+            placeholder="Tu API Key de Intervals.icu"
+            secureTextEntry
+            autoCapitalize="none"
+            error={!!error}
+            errorText={error}
+            style={{ marginBottom: 16 }}
+          />
+
+          <View style={styles.pwActions}>
+            <Button
+              title="Cancelar"
+              variant="secondary"
+              onPress={onClose}
+              disabled={isSaving}
+              style={styles.pwCancelBtn}
+            />
+            <Button
+              title="Guardar credenciales"
+              variant="primary"
+              onPress={onSave}
+              loading={isSaving}
+              disabled={isSaving}
+              style={styles.pwSaveBtn}
+            />
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -49,11 +138,22 @@ function ChangePasswordSheet({
   onSave,
   styles,
 }) {
-  const [showNew, setShowNew] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [showNew, setShowNew] = React.useState(false);
+  const [showConfirm, setShowConfirm] = React.useState(false);
+  const { scrollOffsetY } = useModalSwipeScroll(110, visible);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      isVisible={visible}
+      onBackdropPress={onClose}
+      onBackButtonPress={onClose}
+      onSwipeComplete={onClose}
+      swipeDirection={scrollOffsetY <= 0 ? ['down'] : undefined}
+      propagateSwipe={true}
+      animationIn="slideInUp"
+      animationOut="slideOutDown"
+      style={{ margin: 0, justifyContent: 'flex-end' }}
+    >
       <KeyboardAvoidingView
         style={styles.pwSheetOverlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -67,60 +167,49 @@ function ChangePasswordSheet({
           </Text>
 
           <Text style={styles.pwLabel}>Nueva Contraseña</Text>
-          <View style={[styles.pwInputWrapper, !!passwordError && styles.pwInputWrapperError]}>
-            <TextInput
-              style={styles.pwInput}
-              placeholder="••••••••"
-              placeholderTextColor="#444"
-              value={newPassword}
-              onChangeText={setNewPassword}
-              secureTextEntry={!showNew}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity style={styles.pwEyeBtn} onPress={() => setShowNew(v => !v)}>
-              {showNew ? <EyeOff color="#555" size={20} /> : <Eye color="#555" size={20} />}
-            </TouchableOpacity>
-          </View>
+          <Input
+            value={newPassword}
+            onChangeText={setNewPassword}
+            placeholder="••••••••"
+            secureTextEntry={!showNew}
+            autoCapitalize="none"
+            error={!!passwordError}
+            rightAccessory={
+              <TouchableOpacity style={styles.pwEyeBtn} onPress={() => setShowNew((v) => !v)}>
+                {showNew ? <EyeOff color="#555" size={20} /> : <Eye color="#555" size={20} />}
+              </TouchableOpacity>
+            }
+            style={{ marginBottom: 16 }}
+          />
 
           <Text style={styles.pwLabel}>Confirmar Contraseña</Text>
-          <View style={[styles.pwInputWrapper, !!passwordError && styles.pwInputWrapperError]}>
-            <TextInput
-              style={styles.pwInput}
-              placeholder="••••••••"
-              placeholderTextColor="#444"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry={!showConfirm}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity style={styles.pwEyeBtn} onPress={() => setShowConfirm(v => !v)}>
-              {showConfirm ? <EyeOff color="#555" size={20} /> : <Eye color="#555" size={20} />}
-            </TouchableOpacity>
-          </View>
+          <Input
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            placeholder="••••••••"
+            secureTextEntry={!showConfirm}
+            autoCapitalize="none"
+            error={!!passwordError}
+            errorText={passwordError}
+            rightAccessory={
+              <TouchableOpacity style={styles.pwEyeBtn} onPress={() => setShowConfirm((v) => !v)}>
+                {showConfirm ? <EyeOff color="#555" size={20} /> : <Eye color="#555" size={20} />}
+              </TouchableOpacity>
+            }
+            style={{ marginBottom: 16 }}
+          />
 
-          {!!passwordError && (
-            <Text style={styles.pwErrorText}>{passwordError}</Text>
-          )}
+          {!!passwordError && <Text style={styles.pwErrorText}>{passwordError}</Text>}
 
           <View style={styles.pwActions}>
-            <TouchableOpacity style={styles.pwCancelBtn} onPress={onClose} disabled={isUpdating}>
-              <Text style={styles.pwCancelText}>Cancelar</Text>
-            </TouchableOpacity>
-            <LinearGradient
-              colors={['#00F0FF', '#39FF14']}
-              start={{ x: 0, y: 0.5 }}
-              end={{ x: 1, y: 0.5 }}
-              style={styles.pwSaveBtn}
-            >
-              <TouchableOpacity style={styles.pwSaveGradient} onPress={onSave} disabled={isUpdating}>
-                {isUpdating
-                  ? <ActivityIndicator size="small" color="#121212" />
-                  : <Text style={styles.pwSaveText}>Guardar Cambios 💾</Text>
-                }
-              </TouchableOpacity>
-            </LinearGradient>
+            <Button
+              title="Guardar Cambios"
+              variant="primary"
+              onPress={onSave}
+              loading={isUpdating}
+              disabled={isUpdating}
+              style={[styles.pwSaveBtn, { flex: 1 }]}
+            />
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -129,41 +218,54 @@ function ChangePasswordSheet({
 }
 
 // ─────────────────────────────────────────────────────────────
-// Updating Password Progress Overlay
-// ─────────────────────────────────────────────────────────────
-function UpdatingPasswordOverlay({ visible, styles }) {
-  return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.updatingOverlay}>
-        <View style={styles.updatingCard}>
-          <ActivityIndicator size="large" color="#00F0FF" style={{ marginBottom: 20 }} />
-          <Text style={styles.updatingTitle}>Actualizando credenciales...</Text>
-          <Text style={styles.updatingText}>
-            Actualizando tus credenciales de seguridad... 🛡️
-          </Text>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Main View
+// PerfilView (raíz)
 // ─────────────────────────────────────────────────────────────
 export function PerfilView({
+  profileData,
+  loading,
   nombre,
   setNombre,
   nombreError,
+  edad,
+  setEdad,
+  tallaCm,
+  setTallaCm,
+  pesoKg,
+  setPesoKg,
+  modalidad,
+  setModalidad,
+  categoria,
+  setCategoria,
   rol,
   setRol,
   email,
-  loading,
   isSavingPerfil,
-  handleGuardar,
+  handleGuardarBiometria,
+  handleGuardarPreferencias,
+  handleInsertContacto,
+  handleUpdateContacto,
+  handleDeleteContacto,
   handleLogout,
-  handleVincularStrava,
   handleVincularIntervalos,
-  // Password change
+  codigoVinculacion,
+  handlePlatformPress,
+  handleCopyCodigo,
+  handleShareCodigo,
+  showIntervalosSheet,
+  idExterno,
+  setIdExterno,
+  apiKeyIntervalos,
+  setApiKeyIntervalos,
+  intervalosError,
+  isSavingIntervalos,
+  handleCerrarIntervalosSheet,
+  handleGuardarIntervalos,
+  codigoIngresado,
+  handleCodigoIngresadoChange,
+  handleVincularConCodigo,
+  vincularLoading,
+  vincularError,
+  relacionesActivas,
   showPasswordSheet,
   newPassword,
   setNewPassword,
@@ -174,95 +276,108 @@ export function PerfilView({
   handleAbrirCambioContrasena,
   handleCerrarCambioContrasena,
   handleGuardarContrasena,
+  refreshUserData,
+  showBiometriaSheet,
+  showNotificacionesSheet,
+  handleOpenBiometriaSheet,
+  handleCloseBiometriaSheet,
+  handleOpenNotificacionesSheet,
+  handleCloseNotificacionesSheet,
+  showToast,
   styles,
 }) {
+  const { scrollHandler, HEADER_MAX_HEIGHT, interpolations, insets } = useCollapsibleHeader({ compact: true });
+  const displayNombre = profileData?.nombre || nombre;
+
+  const isAnySheetVisible = showBiometriaSheet || showNotificacionesSheet || showIntervalosSheet || showPasswordSheet;
+  useNavigationBarColor(isAnySheetVisible, '#131313', '#121212');
+
   return (
-    <ScreenWrapper style={styles.safeContainer}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.title}>Perfil</Text>
-
-        {/* INFORMACIÓN */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>INFORMACIÓN</Text>
-
-          <Text style={styles.label}>Nombre</Text>
-          <TextInput
-            style={[styles.input, !!nombreError && styles.inputError]}
-            value={nombre}
-            onChangeText={setNombre}
-            placeholder="Tu nombre"
-            placeholderTextColor="#666"
+    <ScreenWrapper style={styles.safeContainer} edges={['left', 'right']}>
+      <CollapsibleHeader
+        editorialLabel={displayNombre || email || '—'}
+        editorialTitle="Perfil"
+        smallTitle="Perfil"
+        rightAction={
+          <AnimatedActionButton
+            label="Editar"
+            icon={<Ionicons name="pencil-outline" size={20} color="#00D2FF" />}
+            onPress={handleOpenBiometriaSheet}
+            interpolations={interpolations}
           />
-          {!!nombreError && (
-            <Text style={styles.inputErrorText}>{nombreError}</Text>
-          )}
+        }
+        interpolations={interpolations}
+        insets={insets}
+      />
+      <Animated.ScrollView
+        bounces={false}
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: HEADER_MAX_HEIGHT }]}
+        showsVerticalScrollIndicator={false}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+      >
+        {/* Social ID Card (tarjeta crédito / licencia deportiva) */}
+        <UserIdCard
+          codigo={codigoVinculacion}
+          onCopy={handleCopyCodigo}
+          onShare={handleShareCodigo}
+          styles={styles}
+        />
 
-          <Text style={styles.label}>Rol</Text>
-          <View style={styles.rolPills}>
-            {ROL_OPTIONS.map(opcion => (
-              <TouchableOpacity
-                key={opcion}
-                style={[styles.rolPill, rol === opcion && styles.rolPillActive]}
-                onPress={() => setRol(opcion)}
-              >
-                <Text style={[styles.rolPillText, rol === opcion && styles.rolPillTextActive]}>
-                  {opcion}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        {/* 3. Card Biometría (estática, label + valor técnico) */}
+        <BiometriaDashboardCard profileData={profileData} styles={styles} />
 
-          <Text style={[styles.label, { marginTop: 4 }]}>Email</Text>
-          <Text style={[styles.input, { color: '#888' }]}>{email}</Text>
+        {/* 4. Card Notificaciones (estática, preferencias_notificaciones, Editar → Sheet) */}
+        <NotificacionesDashboardCard
+          preferencias={profileData?.preferencias}
+          onEditar={handleOpenNotificacionesSheet}
+          styles={styles}
+        />
 
-          <LinearGradient
-            colors={['#00F0FF', '#39FF14']}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={styles.guardarBtn}
-          >
-            <TouchableOpacity
-              style={styles.guardarGradient}
-              onPress={handleGuardar}
-              disabled={isSavingPerfil}
-            >
-              {isSavingPerfil
-                ? <ActivityIndicator size="small" color="#121212" />
-                : <Text style={styles.guardarBtnText}>💾 Guardar Cambios</Text>
-              }
-            </TouchableOpacity>
-          </LinearGradient>
-        </View>
+        {/* 5. Contactos de emergencia (estática + Modal Añadir/Editar) */}
+        <ContactosEmergenciaSection
+          contactos={profileData?.contactosEmergencia}
+          onInsert={handleInsertContacto}
+          onUpdate={handleUpdateContacto}
+          onDelete={handleDeleteContacto}
+          onRefresh={refreshUserData}
+          showToast={showToast}
+          styles={styles}
+        />
 
-        {/* SEGURIDAD */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>SEGURIDAD</Text>
+        {/* 6. Integraciones (Intervals, Strava, Garmin, Wahoo; badge estado; tap → flujo) */}
+        <IntegracionesSection
+          integraciones={profileData?.integraciones}
+          onPlatformPress={handlePlatformPress}
+          styles={styles}
+        />
+
+        {/* 7. Mi entrenador / Vinculación (relaciones_usuarios) */}
+        <EntrenadorSection
+          rol={rol}
+          relacionesActivas={relacionesActivas}
+          codigoIngresado={codigoIngresado}
+          onCodigoIngresadoChange={handleCodigoIngresadoChange}
+          onVincularConCodigo={handleVincularConCodigo}
+          vincularLoading={vincularLoading}
+          vincularError={vincularError}
+          styles={styles}
+        />
+
+        {/* 8. Seguridad */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Seguridad</Text>
           <TouchableOpacity
             style={[styles.button, styles.buttonSecurity]}
             onPress={handleAbrirCambioContrasena}
           >
             <ShieldCheck color="#00F0FF" size={22} />
-            <Text style={styles.buttonText}>Cambiar Contraseña</Text>
+            <Text style={styles.buttonText}>Cambiar contraseña</Text>
           </TouchableOpacity>
         </View>
 
-        {/* VINCULAR CUENTAS */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>VINCULAR CUENTAS</Text>
-          <TouchableOpacity style={styles.button} onPress={handleVincularStrava}>
-            <ExternalLink color="#00F0FF" size={22} />
-            <Text style={styles.buttonText}>Vincular Strava</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={handleVincularIntervalos}>
-            <ExternalLink color="#00F0FF" size={22} />
-            <Text style={styles.buttonText}>Intervalos.icu</Text>
-          </TouchableOpacity>
-        </View>
-
+        {/* 9. Cerrar sesión */}
         <TouchableOpacity
           style={[styles.button, styles.buttonLogout]}
           onPress={handleLogout}
@@ -271,12 +386,54 @@ export function PerfilView({
           <LogOut color="#ff5252" size={22} />
           <Text style={[styles.buttonText, styles.buttonLogoutText]}>Cerrar sesión</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </Animated.ScrollView>
 
-      {/* Saving Perfil Progress Overlay */}
-      <SavingPerfilOverlay visible={isSavingPerfil} styles={styles} />
+      {/* BottomSheets: edición delegada (handlers en usePerfil, refreshUserData tras guardar) */}
+      <BiometriaSheet
+        visible={showBiometriaSheet}
+        onClose={handleCloseBiometriaSheet}
+        nombre={nombre}
+        setNombre={setNombre}
+        nombreError={nombreError}
+        edad={edad}
+        setEdad={setEdad}
+        tallaCm={tallaCm}
+        setTallaCm={setTallaCm}
+        pesoKg={pesoKg}
+        setPesoKg={setPesoKg}
+        modalidad={modalidad}
+        setModalidad={setModalidad}
+        categoria={categoria}
+        setCategoria={setCategoria}
+        rol={rol}
+        setRol={setRol}
+        onGuardar={handleGuardarBiometria}
+        saving={isSavingPerfil}
+        styles={styles}
+      />
 
-      {/* Change Password Bottom Sheet */}
+      <NotificacionesSheet
+        visible={showNotificacionesSheet}
+        onClose={handleCloseNotificacionesSheet}
+        preferencias={profileData?.preferencias}
+        onGuardar={handleGuardarPreferencias}
+        styles={styles}
+      />
+
+      {/* Modals */}
+      <IntervalsSheet
+        visible={showIntervalosSheet}
+        onClose={handleCerrarIntervalosSheet}
+        idExterno={idExterno}
+        setIdExterno={setIdExterno}
+        apiKeyIntervalos={apiKeyIntervalos}
+        setApiKeyIntervalos={setApiKeyIntervalos}
+        error={intervalosError}
+        isSaving={isSavingIntervalos}
+        onSave={handleGuardarIntervalos}
+        styles={styles}
+      />
+
       <ChangePasswordSheet
         visible={showPasswordSheet}
         onClose={handleCerrarCambioContrasena}
@@ -289,9 +446,6 @@ export function PerfilView({
         onSave={handleGuardarContrasena}
         styles={styles}
       />
-
-      {/* Updating Password Progress Overlay */}
-      <UpdatingPasswordOverlay visible={isUpdatingPassword} styles={styles} />
     </ScreenWrapper>
   );
 }

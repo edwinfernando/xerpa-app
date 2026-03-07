@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { theme } from '../styles/theme';
+import { theme } from '../theme/theme';
 
 /**
  * ScreenWrapper — Contenedor base para todas las pantallas de XERPA.
@@ -15,12 +15,14 @@ import { theme } from '../styles/theme';
  *  - children: contenido de la pantalla
  *  - style: estilos adicionales para el SafeAreaView
  *  - padded: (bool, default false) aplica paddingHorizontal global.
- *            Usar false cuando la pantalla maneja su propio padding
- *            (ScrollView con contentContainerStyle, FlatList, etc.)
+ *  - edges: array de edges para SafeAreaView (default: ['top','left','right','bottom']).
+ *            Para pantallas con CollapsibleHeader usar ['left','right','bottom'] para que
+ *            el header se extienda en el área del notch.
  */
-export function ScreenWrapper({ children, style, padded = false }) {
+export function ScreenWrapper({ children, style, padded = false, edges }) {
   return (
     <SafeAreaView
+      edges={edges ?? ['top', 'left', 'right', 'bottom']}
       style={[
         styles.wrapper,
         padded && styles.padded,
@@ -38,6 +40,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   padded: {
-    paddingHorizontal: theme.spacing.screenPadding,
+    paddingHorizontal: theme.SCREEN_PADDING_HORIZONTAL,
   },
 });

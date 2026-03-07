@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Alert } from 'react-native';
 import { supabase } from '../../../supabase';
+import { useToast } from '../../context/ToastContext';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -13,6 +13,7 @@ function mapForgotPasswordError(message) {
 }
 
 export function useForgotPassword() {
+  const { showToast } = useToast();
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,10 +42,7 @@ export function useForgotPassword() {
       if (error) {
         setEmailError(mapForgotPasswordError(error.message));
       } else {
-        Alert.alert(
-          'Correo enviado ✓',
-          'Revisa tu bandeja de entrada para restablecer tu contraseña.'
-        );
+        showToast({ type: 'success', title: 'Correo enviado ✓', message: 'Revisa tu bandeja de entrada para restablecer tu contraseña.' });
       }
     } catch {
       setEmailError('Sin conexión. Comprueba tu internet e inténtalo de nuevo.');
