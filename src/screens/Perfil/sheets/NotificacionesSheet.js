@@ -16,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { useModalSwipeScroll } from '../../../hooks/useModalSwipeScroll';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getSheetModalStyle, getSheetModalProps } from '../../../constants/sheetModalConfig';
 
 const CANAL_OPTIONS = [
   { value: 'Telegram', label: 'Telegram', icon: 'logo-telegram' },
@@ -45,6 +47,7 @@ export function NotificacionesSheet({
     scrollTo,
     onScroll,
   } = useModalSwipeScroll(SWIPE_HEADER_HEIGHT, visible);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (preferencias) {
@@ -83,14 +86,15 @@ export function NotificacionesSheet({
       scrollOffsetMax={0}
       animationIn="slideInUp"
       animationOut="slideOutDown"
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+      style={[getSheetModalStyle()]}
+      {...getSheetModalProps()}
     >
       <KeyboardAvoidingView
         style={styles.sheetOverlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 34) }]}>
           <View style={[styles.sheetHandle, { backgroundColor: '#E5E5EA' }]} />
           <Text style={styles.sheetTitle}>Preferencias y notificaciones</Text>
           <Text style={styles.sheetSubtitle}>Configura cómo quieres recibir las alertas.</Text>

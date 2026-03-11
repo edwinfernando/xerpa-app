@@ -503,6 +503,23 @@ export function useRaceCalendar(user) {
     await fetchRaces();
   }
 
+  async function fetchCarreraById(carreraId) {
+    if (!carreraId) return null;
+    const id = String(carreraId).trim();
+    if (!id) return null;
+    try {
+      const { data, error } = await supabase
+        .from('carreras')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      return data ? { ...data, id: data.id, carrera_id: data.id } : null;
+    } catch {
+      return null;
+    }
+  }
+
   async function fetchRaceCategories(carrera) {
     if (!carrera?.id) return [];
 
@@ -616,6 +633,7 @@ export function useRaceCalendar(user) {
     updateRace,
     updateRaceByCarreraId,
     fetchRaceCategories,
+    fetchCarreraById,
     fetchAddRaceCatalogs,
     fetchGlobalRaces,
     enrollToRace,

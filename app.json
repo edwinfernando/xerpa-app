@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "xerpa-app",
+    "name": "XERPA",
     "slug": "xerpa-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,16 +9,17 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0A1628"
+      "backgroundColor": "#000000"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.xerpa-app"
     },
     "android": {
+      "userInterfaceStyle": "dark",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "pan",
@@ -34,6 +35,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "expo-system-ui",
       "expo-web-browser",
       [
         "expo-location",
@@ -49,7 +51,20 @@
           "sounds": []
         }
       ],
-      "@react-native-community/datetimepicker"
+      [
+        "@react-native-community/datetimepicker",
+        {
+          "android": {
+            "datePicker": {
+              "windowBackground": { "light": "#FFFFFF", "dark": "#1C1C1E" },
+              "textColorPrimary": { "light": "#000000", "dark": "#FFFFFF" },
+              "textColorSecondary": { "light": "#666666", "dark": "#8E8E93" },
+              "colorAccent": { "light": "#00D2FF", "dark": "#00D2FF" },
+              "colorControlActivated": { "light": "#00D2FF", "dark": "#00D2FF" }
+            }
+          }
+        }
+      ]
     ],
     "scheme": "xerpa"
   }

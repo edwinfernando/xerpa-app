@@ -59,6 +59,8 @@ export function Input({
   variant = 'default', // default | inline | embedded | glass (premium sheets)
   // Cuando true, no se aplica borde de foco en el Input (el padre lo maneja)
   hideFocusBorder = false,
+  // Override del color de borde en estado focus (ej. #00D2FF para sheets neón)
+  focusBorderColor,
   onFocus: onFocusProp,
   onBlur: onBlurProp,
   ...rest
@@ -81,7 +83,7 @@ export function Input({
     variant === 'embedded' && styles.wrapperEmbedded,
     variant === 'glass' && styles.wrapperGlass,
     rightAccessory && styles.wrapperRow,
-    focused && !hideFocusBorder && styles.wrapperFocused,
+    focused && !hideFocusBorder && [styles.wrapperFocused, focusBorderColor && { borderColor: focusBorderColor }],
     error && styles.wrapperError,
   ];
 

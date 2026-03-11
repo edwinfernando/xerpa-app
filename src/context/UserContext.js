@@ -5,18 +5,10 @@
  * para que toda la UI se actualice (p. ej. tras actualización desde XERPA AI).
  */
 import React, { createContext, useContext, useCallback, useMemo } from 'react';
-import { LayoutAnimation, Platform, UIManager } from 'react-native';
+import { LayoutAnimation, Platform } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../api/queryClient';
 import { fetchUserProfile } from '../api/userProfileApi';
-
-if (
-  Platform.OS === 'android'
-  && !global?.nativeFabricUIManager
-  && UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const UserContext = createContext({
   profileData: null,

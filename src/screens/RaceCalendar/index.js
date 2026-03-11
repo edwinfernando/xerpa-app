@@ -29,8 +29,9 @@ const headerOptions = (navigation, title) => ({
   headerTitleStyle: { fontWeight: '700' },
 });
 
-export default function RaceCalendarScreen({ user }) {
+export default function RaceCalendarScreen({ user, route }) {
   const { showToast } = useToast();
+  const initialCarreraId = route?.params?.carreraId ?? null;
   const {
     races,
     loading,
@@ -52,6 +53,7 @@ export default function RaceCalendarScreen({ user }) {
     updateRace,
     updateRaceByCarreraId,
     fetchRaceCategories,
+    fetchCarreraById,
     fetchAddRaceCatalogs,
     fetchGlobalRaces,
     enrollToRace,
@@ -68,6 +70,8 @@ export default function RaceCalendarScreen({ user }) {
       <Stack.Screen name="RaceCalendarHome" options={{ headerShown: false }}>
         {({ navigation }) => (
           <RaceCalendarView
+            initialCarreraId={initialCarreraId}
+            fetchCarreraById={fetchCarreraById}
             races={races}
             loading={loading}
             error={error}
@@ -96,7 +100,10 @@ export default function RaceCalendarScreen({ user }) {
 
       <Stack.Screen
         name="AddRace"
-        options={({ navigation }) => headerOptions(navigation, 'Nueva Carrera')}
+        options={({ navigation }) => ({
+          presentation: 'fullScreenModal',
+          ...headerOptions(navigation, 'Nueva Carrera'),
+        })}
       >
         {({ navigation, route }) => (
           <AddRaceScreen
@@ -116,7 +123,10 @@ export default function RaceCalendarScreen({ user }) {
       <Stack.Screen
         name="AddRaceMapPicker"
         component={AddRaceMapPickerScreen}
-        options={({ navigation }) => headerOptions(navigation, 'Seleccionar en mapa')}
+        options={({ navigation }) => ({
+          presentation: 'fullScreenModal',
+          ...headerOptions(navigation, 'Seleccionar en mapa'),
+        })}
       />
     </Stack.Navigator>
   );

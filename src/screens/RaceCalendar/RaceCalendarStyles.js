@@ -90,6 +90,47 @@ export const raceCalendarStyles = StyleSheet.create({
     marginTop: 2,
   },
 
+  // ── Top Tabs (Premium Dark + Neon) ─────────────────────────
+  topTabsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    paddingBottom: 0,
+    position: 'relative',
+  },
+  topTabBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topTabTextActive: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  topTabTextInactive: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#8E8E93',
+  },
+  topTabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    height: 3,
+    backgroundColor: '#00D2FF',
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+    shadowColor: '#00D2FF',
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    shadowOffset: { height: -2, width: 0 },
+    ...(Platform.OS === 'android' && { elevation: 8 }),
+  },
+
   // ── List ───────────────────────────────────────────────────
   list: {
     gap: 12,
@@ -854,11 +895,22 @@ export const raceCalendarStyles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 20,
   },
+  sheetHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
   sheetTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 6,
+    flex: 1,
+    minWidth: 0,
+  },
+  sheetHeaderShareBtn: {
+    padding: 6,
+    marginLeft: 8,
   },
   sheetTitle: {
     color: '#fff',
@@ -946,7 +998,6 @@ export const raceCalendarStyles = StyleSheet.create({
     borderTopRightRadius: 28,
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 40,
     borderTopWidth: 1,
     borderColor: '#2A2A2A',
     maxHeight: '90%',
@@ -1781,9 +1832,9 @@ export const raceCalendarStyles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     paddingBottom: Math.max(12, theme.SHEET_PADDING_BOTTOM),
-    borderTopWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
     backgroundColor: '#1C1C1E',
+    borderTopWidth: 0,
+    ...(Platform.OS === 'android' && { elevation: 0 }),
   },
   detailFooterActions: {
     flexDirection: 'row',
@@ -1894,7 +1945,8 @@ export const raceCalendarStyles = StyleSheet.create({
   },
   detailCategoryChipsRow: {
     gap: 8,
-    paddingVertical: 4,
+    paddingTop: 12,
+    paddingBottom: 4,
     paddingRight: 4,
   },
   detailCategoryChip: {
@@ -1961,6 +2013,45 @@ export const raceCalendarStyles = StyleSheet.create({
     color: '#00F0FF',
     fontSize: 14,
     fontWeight: '700',
+  },
+  detailVerMapaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(0, 210, 255, 0.08)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 210, 255, 0.35)',
+  },
+  detailVerMapaButtonText: {
+    color: '#00D2FF',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  detailCoordsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  detailCoordsLabel: {
+    color: '#8E8E93',
+    fontSize: 12,
+    letterSpacing: 0.5,
+    flex: 1,
+  },
+  detailCoordsActions: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  detailCoordsIconBtn: {
+    padding: 8,
   },
   detailBadgesRow: {
     flexDirection: 'row',

@@ -26,6 +26,8 @@ import { getTodayPlan } from '../../services/offlineStorage';
 import { saveManualEffort } from '../../services/effortSync';
 import { useNavigationBarColor } from '../../hooks/useNavigationBarColor';
 import { useModalSwipeScroll } from '../../hooks/useModalSwipeScroll';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getSheetModalStyle, getSheetModalProps } from '../../constants/sheetModalConfig';
 import { theme } from '../../theme/theme';
 import { formatDuracion } from '../../utils/formatDuracion';
 
@@ -77,6 +79,7 @@ function RPEBottomSheet({ visible, totalSecs, onClose, onSave }) {
   const [rpe, setRpe] = useState(5);
   const [saving, setSaving] = useState(false);
   const { scrollOffsetY } = useModalSwipeScroll(110, visible);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (visible) setRpe(5);
@@ -102,12 +105,13 @@ function RPEBottomSheet({ visible, totalSecs, onClose, onSave }) {
       propagateSwipe={true}
       animationIn="slideInUp"
       animationOut="slideOutDown"
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+      style={[getSheetModalStyle()]}
+      {...getSheetModalProps()}
     >
       <View style={styles.modalOverlay}>
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => onClose()} />
 
-        <View style={styles.bottomSheet}>
+        <View style={[styles.bottomSheet, { paddingBottom: Math.max(insets.bottom, 24) }]}>
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>¿Qué tan duro fue el entrenamiento?</Text>
           <Text style={styles.sheetTimer}>{formatTimer(totalSecs)}</Text>

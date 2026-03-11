@@ -41,10 +41,24 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session }, error }) => {
+        if (error) {
+          const msg = error?.message?.toLowerCase() || '';
+          if (msg.includes('refresh') && msg.includes('token')) {
+            supabase.auth.signOut().finally(() => {
+              setUser(null);
+              setLoading(false);
+            });
+            return;
+          }
+        }
+        setUser(session?.user ?? null);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
@@ -100,7 +114,23 @@ export default function App() {
       <ActivityIndicator size="large" color="#00F0FF" />
     </View>
   ) : (
-    <NavigationContainer>
+    <NavigationContainer
+      linking={{
+        prefixes: ['xerpa://'],
+        config: {
+          screens: {
+            MainTabs: {
+              path: '',
+              screens: {
+                Carreras: {
+                  path: 'carreras/race/:carreraId',
+                },
+              },
+            },
+          },
+        },
+      }}
+    >
       <ToastContextProvider>
         {showMainApp ? (
           <UserContextProvider authUser={user}>

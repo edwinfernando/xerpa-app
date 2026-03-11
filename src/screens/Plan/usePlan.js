@@ -1,3 +1,10 @@
+/**
+ * Plan (Semana actual + Historial).
+ * - Generar Plan solo visible cuando no hay entrenos en la semana.
+ * - TODO: Sincronizar con Intervals/Strava para marcar entrenos del día como
+ *   completado si existe una actividad ese día (actividades_cache o API). Ver
+ *   integraciones_terceros, esfuerzo_manual y n8n para el flujo de sync.
+ */
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../supabase';
 import { useToast } from '../../context/ToastContext';

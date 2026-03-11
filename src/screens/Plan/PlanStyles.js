@@ -24,6 +24,47 @@ export const planStyles = StyleSheet.create({
     marginRight: 12,
   },
 
+  // ── Top Tabs (Premium Dark + Neón) ────────────────────────
+  topTabsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    paddingBottom: 0,
+    position: 'relative',
+  },
+  topTabBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topTabTextActive: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  topTabTextInactive: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#8E8E93',
+  },
+  topTabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    height: 3,
+    backgroundColor: '#00D2FF',
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+    shadowColor: '#00D2FF',
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    shadowOffset: { height: -2, width: 0 },
+    ...(Platform.OS === 'android' && { elevation: 8 }),
+  },
+
   // ── Action Bar ────────────────────────────────────────────
   actionBar: {
     flexDirection: 'row',
@@ -360,15 +401,43 @@ export const planStyles = StyleSheet.create({
     fontSize: 14,
   },
 
-  // ── Loading (Skeleton) ─────────────────────────────────────
-  skeletonWrap: {
+  // ── Loading (Skeleton dentro de segmentos) ──────────────────
+  skeletonCardWrap: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    marginBottom: 12,
+  },
+  skeletonCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  skeletonCardMeta: {
     flex: 1,
-    paddingHorizontal: theme.spacing.screenPadding,
-    paddingTop: 20,
+  },
+  skeletonCardLabel: {
+    marginBottom: 6,
+  },
+  skeletonCardTitle: {},
+  skeletonStatsRow: {
+    flexDirection: 'row',
     gap: 12,
   },
-  skeletonCard: {
-    alignSelf: 'stretch',
+  skeletonHistoryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    gap: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  skeletonHistoryContent: {
+    flex: 1,
   },
 
   // ── Manual Workout Modal ───────────────────────────────────

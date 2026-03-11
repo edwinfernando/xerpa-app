@@ -1,0 +1,7 @@
+# Configuración de Edge Functions
+# https://supabase.com/docs/guides/functions/function-configuration
+
+# strava-auth: desactiva verificación JWT en el gateway (401 con ES256).
+# La función valida user_id en el body; se puede añadir verificación manual si se requiere.
+[functions.strava-auth]
+verify_jwt = false

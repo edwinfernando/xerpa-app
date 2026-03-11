@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
   Animated,
-  ScrollView,
   TouchableOpacity,
   Platform,
   LayoutAnimation,
   FlatList,
   StyleSheet,
+  Dimensions,
 } from 'react-native';
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
@@ -17,7 +18,7 @@ import { ScreenWrapper } from '../../components/ScreenWrapper';
 import { CollapsibleHeader } from '../../components/CollapsibleHeader';
 import { useCollapsibleHeader } from '../../hooks/useCollapsibleHeader';
 import {
-  Plus, Calendar, Map, MapPin, Mountain, TrendingUp,
+  Plus, Map, MapPin, Mountain, TrendingUp,
   Trophy, AlertCircle, MountainSnow, Route,
 } from 'lucide-react-native';
 import { AnimatedActionButton } from '../../components/ui/AnimatedActionButton';
@@ -34,6 +35,7 @@ import { PastRaceResultSheet } from '../../components/races/PastRaceResultSheet'
 import { GlobalEmptyState } from '../../components/ui/GlobalEmptyState';
 import { theme } from '../../theme/theme';
 import { Skeleton } from '../../components/ui/Skeleton';
+import PagerView from 'react-native-pager-view';
 
 // ─────────────────────────────────────────────────────────────
 // Helpers
@@ -62,6 +64,8 @@ function RaceCardSkeletons({ count = 4, styles }) {
 // RaceCalendarView
 // ─────────────────────────────────────────────────────────────
 export function RaceCalendarView({
+  initialCarreraId,
+  fetchCarreraById,
   races,
   loading,
   error,
@@ -86,6 +90,8 @@ export function RaceCalendarView({
   styles,
 }) {
   const { showToast } = useToast();
+  const navigation = useNavigation();
+  const handledInitialCarreraRef = useRef(false);
   const [activeTab, setActiveTab] = useState(TABS.MI_CALENDARIO);
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
   const [detailCarrera, setDetailCarrera] = useState(null);
@@ -93,6 +99,35 @@ export function RaceCalendarView({
   const [detailCategoriesLoading, setDetailCategoriesLoading] = useState(false);
   const [selectedPastRace, setSelectedPastRace] = useState(null);
   const detailFetchSeqRef = useRef(0);
+
+  // Top Tabs: indicador neón animado
+  const TAB_ORDER = [TABS.MI_CALENDARIO, TABS.EVENTOS_XERPA, TABS.RUTAS_LOCALES];
+  const [headerWidth, setHeaderWidth] = useState(
+    () => Dimensions.get('window').width - 2 * theme.spacing.screenPadding
+  );
+  const indicatorTranslateX = useRef(new Animated.Value(0)).current;
+  const tabWidth = headerWidth / 3;
+
+  useEffect(() => {
+    const idx = TAB_ORDER.indexOf(activeTab);
+    const toValue = idx >= 0 ? idx * tabWidth : 0;
+    Animated.spring(indicatorTranslateX, {
+      toValue,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 12,
+    }).start();
+  }, [activeTab, tabWidth]);
+
+  const handleHeaderLayout = useCallback((e) => {
+    const { width } = e.nativeEvent.layout;
+    if (width > 0) setHeaderWidth(width);
+  }, []);
+
+  const pagerRef = useRef(null);
+  const setPage = useCallback((index) => {
+    pagerRef.current?.setPage(index);
+  }, []);
 
   useEffect(() => {
     if (activeTab === TABS.EVENTOS_XERPA || activeTab === TABS.RUTAS_LOCALES) {
@@ -132,9 +167,45 @@ export function RaceCalendarView({
     }
   }, [fetchRaceCategories]);
 
-  const { scrollHandler, HEADER_MAX_HEIGHT, interpolations, insets } = useCollapsibleHeader({ compact: true });
+  const { scrollHandler, scrollY, HEADER_MAX_HEIGHT, interpolations, insets } = useCollapsibleHeader({ compact: true, hideOnScroll: true });
+
+  const segmentBarPaddingTop = React.useMemo(
+    () =>
+      interpolations.headerHeight.interpolate({
+        inputRange: [0, HEADER_MAX_HEIGHT],
+        outputRange: [insets.top, 0],
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      }),
+    [interpolations.headerHeight, HEADER_MAX_HEIGHT, insets.top]
+  );
+
+  const flatListRefs = useRef([null, null, null]);
+
+  useEffect(() => {
+    Animated.timing(scrollY, {
+      toValue: 0,
+      duration: 280,
+      useNativeDriver: false,
+    }).start();
+    const idx = TAB_ORDER.indexOf(activeTab);
+    flatListRefs.current[idx]?.scrollToOffset?.({ offset: 0, animated: true });
+  }, [activeTab, scrollY]);
   const isAnyModalVisible = filterSheetVisible || !!detailCarrera || !!selectedPastRace;
   useNavigationBarColor(isAnyModalVisible, '#131313', '#121212');
+
+  useEffect(() => {
+    if (!initialCarreraId || !fetchCarreraById || handledInitialCarreraRef.current) return;
+    handledInitialCarreraRef.current = true;
+    let cancelled = false;
+    (async () => {
+      const carrera = await fetchCarreraById(initialCarreraId);
+      if (cancelled || !carrera) return;
+      handleOpenDetail(carrera);
+      navigation.getParent()?.setParams?.({ carreraId: undefined });
+    })();
+    return () => { cancelled = true; };
+  }, [initialCarreraId, fetchCarreraById, handleOpenDetail, navigation]);
 
   function openPastRaceSheet(item) {
     setSelectedPastRace(item);
@@ -191,23 +262,38 @@ export function RaceCalendarView({
     return d.toISOString().slice(0, 10);
   }, []);
 
-  const listData = useMemo(() => {
-    if (activeTab === TABS.MI_CALENDARIO) {
-      if (loading || error) return [];
-      const nextRace = filteredRaces.find((r) => !isPastRace(r));
-      const nextRaceId = nextRace ? (nextRace.id ?? nextRace.inscripcion_id ?? nextRace.carrera_id) : null;
-      return filteredRaces.map((r) => {
-        const id = r.id ?? r.inscripcion_id ?? r.carrera_id;
-        const isNextRace = id != null && id === nextRaceId;
-        const isPastRaceVal = isPastRace(r);
-        return { ...r, isNextRace, isPastRace: isPastRaceVal };
-      });
-    }
-    if (activeTab === TABS.EVENTOS_XERPA) return globalLoading || globalError ? [] : filteredEventosXerpa;
-    return globalLoading || globalError ? [] : filteredRutasLocales;
-  }, [activeTab, loading, error, filteredRaces, globalLoading, globalError, filteredEventosXerpa, filteredRutasLocales]);
+  const listDataMisRetos = useMemo(() => {
+    if (loading || error) return [];
+    const nextRace = filteredRaces.find((r) => !isPastRace(r));
+    const nextRaceId = nextRace ? (nextRace.id ?? nextRace.inscripcion_id ?? nextRace.carrera_id) : null;
+    return filteredRaces.map((r) => {
+      const id = r.id ?? r.inscripcion_id ?? r.carrera_id;
+      const isNextRace = id != null && id === nextRaceId;
+      const isPastRaceVal = isPastRace(r);
+      return { ...r, isNextRace, isPastRace: isPastRaceVal };
+    });
+  }, [loading, error, filteredRaces]);
 
-  const showSearchBar = listData.length > 0;
+  const listDataCarreras = useMemo(
+    () => (globalLoading || globalError ? [] : filteredEventosXerpa),
+    [globalLoading, globalError, filteredEventosXerpa]
+  );
+
+  const listDataEventos = useMemo(
+    () => (globalLoading || globalError ? [] : filteredRutasLocales),
+    [globalLoading, globalError, filteredRutasLocales]
+  );
+
+  const listDataByTab = useMemo(
+    () => ({
+      [TABS.MI_CALENDARIO]: listDataMisRetos,
+      [TABS.EVENTOS_XERPA]: listDataCarreras,
+      [TABS.RUTAS_LOCALES]: listDataEventos,
+    }),
+    [listDataMisRetos, listDataCarreras, listDataEventos]
+  );
+
+  const showSearchBar = listDataByTab[activeTab]?.length > 0;
 
   const keyExtractor = useCallback((item) => String(item.id ?? item.inscripcion_id ?? item.carrera_id ?? Math.random()), []);
 
@@ -242,40 +328,46 @@ export function RaceCalendarView({
     [handleCardPress, isEnrolledIn, ctl, styles]
   );
 
-  const renderItem = useCallback(
-    (args) =>
-      activeTab === TABS.MI_CALENDARIO
-        ? renderMiCalendarioItem(args)
-        : renderGlobalItem(args),
-    [activeTab, renderMiCalendarioItem, renderGlobalItem]
-  );
+  const goToCarreras = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setPage(1);
+    setActiveTab(TABS.EVENTOS_XERPA);
+  }, [setPage]);
 
-  const listEmptyComponent = useMemo(() => {
-    if (activeTab === TABS.MI_CALENDARIO) {
-      if (loading) return null;
-      if (error) return null;
-      return (
-        <GlobalEmptyState
-          icon={<Map color="#00D2FF" size={48} strokeWidth={1.5} />}
-          title="Sin Objetivos a la Vista"
-          subtitle="No tienes carreras programadas. Explora el calendario y fija tu próxima meta para que XERPA AI adapte tu entrenamiento."
-          primaryButtonText="Explorar Carreras"
-          onPrimaryPress={switchToEventosXerpa}
-        />
-      );
-    }
-    if (activeTab === TABS.EVENTOS_XERPA) {
-      if (globalLoading || globalError) return null;
-      return (
-        <GlobalEmptyState
-          icon={<Trophy color="#555555" size={48} strokeWidth={1.5} />}
-          title="Palmarés en Blanco"
-          subtitle="Tus carreras completadas y resultados aparecerán aquí. ¡Prepárate para cruzar tu primera línea de meta!"
-          secondaryButtonText="Ir a Mi Calendario"
-          onSecondaryPress={switchToMiCalendario}
-        />
-      );
-    }
+  const goToMisRetos = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setPage(0);
+    setActiveTab(TABS.MI_CALENDARIO);
+  }, [setPage]);
+
+  const listEmptyMisRetos = useMemo(() => {
+    if (loading) return null;
+    if (error) return null;
+    return (
+      <GlobalEmptyState
+        icon={<Map color="#00D2FF" size={48} strokeWidth={1.5} />}
+        title="Sin Objetivos a la Vista"
+        subtitle="No tienes carreras programadas. Explora el calendario y fija tu próxima meta para que XERPA AI adapte tu entrenamiento."
+        primaryButtonText="Explorar Carreras"
+        onPrimaryPress={goToCarreras}
+      />
+    );
+  }, [loading, error, goToCarreras]);
+
+  const listEmptyCarreras = useMemo(() => {
+    if (globalLoading || globalError) return null;
+    return (
+      <GlobalEmptyState
+        icon={<Trophy color="#555555" size={48} strokeWidth={1.5} />}
+        title="Palmarés en Blanco"
+        subtitle="Tus carreras completadas y resultados aparecerán aquí. ¡Prepárate para cruzar tu primera línea de meta!"
+        secondaryButtonText="Ir a Mi Calendario"
+        onSecondaryPress={goToMisRetos}
+      />
+    );
+  }, [globalLoading, globalError, goToMisRetos]);
+
+  const listEmptyEventos = useMemo(() => {
     if (globalLoading || globalError) return null;
     return (
       <GlobalEmptyState
@@ -283,70 +375,56 @@ export function RaceCalendarView({
         title="Sin Rutas Locales"
         subtitle="Eventos de comunidad o travesías menores aparecerán aquí. Añade la tuya en Mi Calendario o explora las carreras."
         secondaryButtonText="Ir a Mi Calendario"
-        onSecondaryPress={switchToMiCalendario}
+        onSecondaryPress={goToMisRetos}
       />
     );
-  }, [activeTab, loading, error, globalLoading, globalError, switchToEventosXerpa, switchToMiCalendario]);
+  }, [globalLoading, globalError, goToMisRetos]);
+
+  const buildListHeader = useCallback(
+    (tab) => {
+      const data = listDataByTab[tab] || [];
+      const hasSearchBar = data.length > 0;
+      return (
+        <>
+          {hasSearchBar && (
+            <View style={{ marginTop: Platform.OS === 'android' ? 20 : 16 }}>
+              <EventFilters
+                filters={filters}
+                setFilter={setFilter}
+                onOpenFilters={() => setFilterSheetVisible(true)}
+                hasActiveFilters={hasActiveFilters}
+                styles={styles}
+              />
+            </View>
+          )}
+          {tab === TABS.MI_CALENDARIO && loading && <RaceCardSkeletons count={4} styles={styles} />}
+          {tab === TABS.MI_CALENDARIO && !loading && !!error && (
+            <View style={styles.errorContainer}>
+              <AlertCircle color="#ff5252" size={32} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+          {tab === TABS.EVENTOS_XERPA && globalLoading && <RaceCardSkeletons count={4} styles={styles} />}
+          {tab === TABS.EVENTOS_XERPA && !globalLoading && !!globalError && (
+            <View style={styles.errorContainer}>
+              <AlertCircle color="#ff5252" size={32} />
+              <Text style={styles.errorText}>{globalError}</Text>
+            </View>
+          )}
+          {tab === TABS.RUTAS_LOCALES && globalLoading && <RaceCardSkeletons count={4} styles={styles} />}
+          {tab === TABS.RUTAS_LOCALES && !globalLoading && !!globalError && (
+            <View style={styles.errorContainer}>
+              <AlertCircle color="#ff5252" size={32} />
+              <Text style={styles.errorText}>{globalError}</Text>
+            </View>
+          )}
+        </>
+      );
+    },
+    [listDataByTab, filters, setFilter, setFilterSheetVisible, hasActiveFilters, styles, loading, error, globalLoading, globalError]
+  );
 
   const FIXED_SEGMENTS_HEIGHT = 48;
-
-  const listHeaderComponent = useMemo(
-    () => (
-      <>
-        {showSearchBar && (
-          <View style={{ marginTop: Platform.OS === 'android' ? 20 : 16 }}>
-            <EventFilters
-              filters={filters}
-              setFilter={setFilter}
-              onOpenFilters={() => setFilterSheetVisible(true)}
-              hasActiveFilters={hasActiveFilters}
-              styles={styles}
-            />
-          </View>
-        )}
-        {activeTab === TABS.MI_CALENDARIO && loading && (
-          <RaceCardSkeletons count={4} styles={styles} />
-        )}
-        {activeTab === TABS.MI_CALENDARIO && !loading && !!error && (
-          <View style={styles.errorContainer}>
-            <AlertCircle color="#ff5252" size={32} />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-        {activeTab === TABS.EVENTOS_XERPA && globalLoading && (
-          <RaceCardSkeletons count={4} styles={styles} />
-        )}
-        {activeTab === TABS.EVENTOS_XERPA && !globalLoading && !!globalError && (
-          <View style={styles.errorContainer}>
-            <AlertCircle color="#ff5252" size={32} />
-            <Text style={styles.errorText}>{globalError}</Text>
-          </View>
-        )}
-        {activeTab === TABS.RUTAS_LOCALES && globalLoading && (
-          <RaceCardSkeletons count={4} styles={styles} />
-        )}
-        {activeTab === TABS.RUTAS_LOCALES && !globalLoading && !!globalError && (
-          <View style={styles.errorContainer}>
-            <AlertCircle color="#ff5252" size={32} />
-            <Text style={styles.errorText}>{globalError}</Text>
-          </View>
-        )}
-      </>
-    ),
-    [
-      activeTab,
-      showSearchBar,
-      filters,
-      setFilter,
-      setFilterSheetVisible,
-      hasActiveFilters,
-      styles,
-      loading,
-      error,
-      globalLoading,
-      globalError,
-    ]
-  );
 
   return (
     <ScreenWrapper style={styles.safeContainer} edges={['left', 'right']}>
@@ -367,28 +445,92 @@ export function RaceCalendarView({
       />
       <View style={{ flex: 1 }}>
         <View style={fixedBarStyles.listWrap}>
-        <AnimatedFlatList
-          data={listData}
-          keyExtractor={keyExtractor}
-          renderItem={renderItem}
-          ListHeaderComponent={listHeaderComponent}
-          ListEmptyComponent={listEmptyComponent}
-          key={activeTab}
-          bounces={false}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingTop: HEADER_MAX_HEIGHT + FIXED_SEGMENTS_HEIGHT },
-            listData.length > 0 ? styles.list : undefined,
-            listData.length === 0 ? styles.emptyListContent : undefined,
-          ]}
-          onScroll={scrollHandler}
-          scrollEventThrottle={16}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={5}
-          removeClippedSubviews={true}
-        />
+          <PagerView
+            ref={pagerRef}
+            style={{ flex: 1 }}
+            initialPage={TAB_ORDER.indexOf(activeTab)}
+            onPageSelected={(e) => {
+              const idx = e.nativeEvent.position;
+              const tab = TAB_ORDER[idx];
+              if (tab !== activeTab) {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setActiveTab(tab);
+              }
+            }}
+          >
+            <View key="0" style={{ flex: 1 }} collapsable={false}>
+              <AnimatedFlatList
+                ref={(r) => { flatListRefs.current[0] = r; }}
+                data={listDataMisRetos}
+                keyExtractor={keyExtractor}
+                renderItem={renderMiCalendarioItem}
+                ListHeaderComponent={buildListHeader(TABS.MI_CALENDARIO)}
+                ListEmptyComponent={listEmptyMisRetos}
+                bounces={false}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={[
+                  styles.scrollContent,
+                  { paddingTop: HEADER_MAX_HEIGHT + FIXED_SEGMENTS_HEIGHT },
+                  listDataMisRetos.length > 0 ? styles.list : undefined,
+                  listDataMisRetos.length === 0 ? styles.emptyListContent : undefined,
+                ]}
+                onScroll={scrollHandler}
+                scrollEventThrottle={16}
+                initialNumToRender={10}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                removeClippedSubviews={true}
+              />
+            </View>
+            <View key="1" style={{ flex: 1 }} collapsable={false}>
+              <AnimatedFlatList
+                ref={(r) => { flatListRefs.current[1] = r; }}
+                data={listDataCarreras}
+                keyExtractor={keyExtractor}
+                renderItem={renderGlobalItem}
+                ListHeaderComponent={buildListHeader(TABS.EVENTOS_XERPA)}
+                ListEmptyComponent={listEmptyCarreras}
+                bounces={false}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={[
+                  styles.scrollContent,
+                  { paddingTop: HEADER_MAX_HEIGHT + FIXED_SEGMENTS_HEIGHT },
+                  listDataCarreras.length > 0 ? styles.list : undefined,
+                  listDataCarreras.length === 0 ? styles.emptyListContent : undefined,
+                ]}
+                onScroll={scrollHandler}
+                scrollEventThrottle={16}
+                initialNumToRender={10}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                removeClippedSubviews={true}
+              />
+            </View>
+            <View key="2" style={{ flex: 1 }} collapsable={false}>
+              <AnimatedFlatList
+                ref={(r) => { flatListRefs.current[2] = r; }}
+                data={listDataEventos}
+                keyExtractor={keyExtractor}
+                renderItem={renderGlobalItem}
+                ListHeaderComponent={buildListHeader(TABS.RUTAS_LOCALES)}
+                ListEmptyComponent={listEmptyEventos}
+                bounces={false}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={[
+                  styles.scrollContent,
+                  { paddingTop: HEADER_MAX_HEIGHT + FIXED_SEGMENTS_HEIGHT },
+                  listDataEventos.length > 0 ? styles.list : undefined,
+                  listDataEventos.length === 0 ? styles.emptyListContent : undefined,
+                ]}
+                onScroll={scrollHandler}
+                scrollEventThrottle={16}
+                initialNumToRender={10}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                removeClippedSubviews={true}
+              />
+            </View>
+          </PagerView>
         </View>
         {/* Segmentos fijos encima del listado */}
         <Animated.View
@@ -399,53 +541,58 @@ export function RaceCalendarView({
           pointerEvents="box-none"
         >
           <View style={fixedBarStyles.background} pointerEvents="none" />
-          <View style={fixedBarStyles.content}>
-            <View style={[styles.segmented, { marginTop: 0, marginBottom: 12 }]}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.segmentedScrollContent}
-                style={styles.segmentedScrollView}
+          <Animated.View
+            style={[fixedBarStyles.content, { paddingTop: segmentBarPaddingTop }]}
+            onLayout={handleHeaderLayout}
+          >
+            <View style={styles.topTabsHeader}>
+              <TouchableOpacity
+                style={styles.topTabBtn}
+                onPress={() => {
+                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                  setPage(0);
+                  setActiveTab(TABS.MI_CALENDARIO);
+                }}
               >
-                <TouchableOpacity
-                  style={[styles.segmentedBtn, activeTab === TABS.MI_CALENDARIO && styles.segmentedBtnActive]}
-                  onPress={() => {
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    setActiveTab(TABS.MI_CALENDARIO);
-                  }}
-                >
-                  <Calendar color={activeTab === TABS.MI_CALENDARIO ? '#00D2FF' : '#8E8E93'} size={16} />
-                  <Text style={[styles.segmentedText, activeTab === TABS.MI_CALENDARIO && styles.segmentedTextActive]}>
-                    Mi calendario
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.segmentedBtn, activeTab === TABS.EVENTOS_XERPA && styles.segmentedBtnActive]}
-                  onPress={() => {
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    setActiveTab(TABS.EVENTOS_XERPA);
-                  }}
-                >
-                  <Trophy color={activeTab === TABS.EVENTOS_XERPA ? '#00D2FF' : '#8E8E93'} size={16} />
-                  <Text style={[styles.segmentedText, activeTab === TABS.EVENTOS_XERPA && styles.segmentedTextActive]}>
-                    Carreras
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.segmentedBtn, activeTab === TABS.RUTAS_LOCALES && styles.segmentedBtnActive]}
-                  onPress={() => {
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    setActiveTab(TABS.RUTAS_LOCALES);
-                  }}
-                >
-                  <Route color={activeTab === TABS.RUTAS_LOCALES ? '#00D2FF' : '#8E8E93'} size={16} />
-                  <Text style={[styles.segmentedText, activeTab === TABS.RUTAS_LOCALES && styles.segmentedTextActive]}>
-                    Eventos
-                  </Text>
-                </TouchableOpacity>
-              </ScrollView>
+                <Text style={activeTab === TABS.MI_CALENDARIO ? styles.topTabTextActive : styles.topTabTextInactive}>
+                  Mis Retos
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.topTabBtn}
+                onPress={() => {
+                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                  setPage(1);
+                  setActiveTab(TABS.EVENTOS_XERPA);
+                }}
+              >
+                <Text style={activeTab === TABS.EVENTOS_XERPA ? styles.topTabTextActive : styles.topTabTextInactive}>
+                  Carreras
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.topTabBtn}
+                onPress={() => {
+                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                  setPage(2);
+                  setActiveTab(TABS.RUTAS_LOCALES);
+                }}
+              >
+                <Text style={activeTab === TABS.RUTAS_LOCALES ? styles.topTabTextActive : styles.topTabTextInactive}>
+                  Eventos
+                </Text>
+              </TouchableOpacity>
+              <Animated.View
+                style={[
+                  styles.topTabIndicator,
+                  {
+                    width: tabWidth,
+                    transform: [{ translateX: indicatorTranslateX }],
+                  },
+                ]}
+              />
             </View>
-          </View>
+          </Animated.View>
         </Animated.View>
       </View>
 
@@ -456,7 +603,7 @@ export function RaceCalendarView({
           filters={filters}
           setFilter={setFilter}
           filterOptions={filterOptions}
-          filteredCount={listData.length}
+          filteredCount={listDataByTab[activeTab]?.length ?? 0}
           onClearAll={() => {
             setFilter('search', '');
             setFilter('pais', '');

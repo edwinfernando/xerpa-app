@@ -16,6 +16,8 @@ import { Button } from '../../../components/ui/Button';
 import { ScreenWrapper } from '../../../components/ScreenWrapper';
 import { showXerpaError } from '../../../utils/ErrorHandler';
 import { PRIORIDADES } from '../../../constants/prioridades';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getSheetModalStyle, getSheetModalProps } from '../../../constants/sheetModalConfig';
 
 const DATE_REGEX = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const EMPTY_FORM = {
@@ -84,15 +86,17 @@ function OptionPickerSheet({
     if (!q) return options;
     return options.filter((o) => String(o?.[labelKey] || '').toLowerCase().includes(q));
   }, [options, search, labelKey]);
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal
       isVisible={visible}
       onBackdropPress={onClose}
       onBackButtonPress={onClose}
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+      style={[getSheetModalStyle()]}
+      {...getSheetModalProps()}
     >
-      <View style={styles.manualPickerSheet}>
+      <View style={[styles.manualPickerSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <View style={styles.manualModalHandle} />
         <View style={styles.manualPickerHeader}>
           <Text style={styles.manualPickerTitle}>{title}</Text>
@@ -215,6 +219,8 @@ export function AddRaceScreen({
     () => ciudadesFiltradas.find((x) => x.id === form.ciudad_id) || null,
     [ciudadesFiltradas, form.ciudad_id]
   );
+
+  const insets = useSafeAreaInsets();
 
   const selectorMeta = useMemo(() => {
     if (activeSelector === 'tipo_evento') {
@@ -438,7 +444,7 @@ export function AddRaceScreen({
             decelerationRate="fast"
             keyboardShouldPersistTaps="handled"
             overScrollMode="never"
-            contentContainerStyle={{ paddingBottom: 28 }}
+            contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 28) }}
           >
             <Text style={styles.manualLabel}>Nombre del evento / copa *</Text>
             <Input
@@ -704,7 +710,7 @@ export function AddRaceScreen({
                     ? new Date(`${form[showDatePickerFor]}T00:00:00`)
                     : new Date()
                 }
-                display="default"
+                display="calendar"
                 onChange={handleDateChange}
                 minimumDate={
                   showDatePickerFor === 'fecha_fin' && form.fecha_inicio
@@ -712,6 +718,8 @@ export function AddRaceScreen({
                     : getTodayStart()
                 }
                 maximumDate={new Date(2030, 11, 31)}
+                locale="es-ES"
+                themeVariant="dark"
               />
             )}
           </ScrollView>

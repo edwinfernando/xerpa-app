@@ -8,7 +8,7 @@
  * 4. BottomSheets: BiometriaSheet, NotificacionesSheet (preferencias_notificaciones)
  * Toda data de notificaciones viene de profileData.preferencias (no usuarios).
  */
-import React from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  StyleSheet,
+  ScrollView,
 } from 'react-native';
 import Modal from 'react-native-modal';
 import { ScreenWrapper } from '../../components/ScreenWrapper';
@@ -35,96 +37,15 @@ import { IntegracionesSection } from './sections/IntegracionesSection';
 import { EntrenadorSection } from './sections/EntrenadorSection';
 import { BiometriaSheet } from './sheets/BiometriaSheet';
 import { NotificacionesSheet } from './sheets/NotificacionesSheet';
+import { IntervalsConnectSheet } from './sheets/IntervalsConnectSheet';
+import { EntrenadorPreviewSheet } from './sheets/EntrenadorPreviewSheet';
 import { useNavigationBarColor } from '../../hooks/useNavigationBarColor';
 import { useModalSwipeScroll } from '../../hooks/useModalSwipeScroll';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getSheetModalStyle, getSheetModalProps, getCenteredModalStyle } from '../../constants/sheetModalConfig';
 
 // ─────────────────────────────────────────────────────────────
-// Intervals.icu Integration Sheet
-// ─────────────────────────────────────────────────────────────
-function IntervalsSheet({
-  visible,
-  onClose,
-  idExterno,
-  setIdExterno,
-  apiKeyIntervalos,
-  setApiKeyIntervalos,
-  error,
-  isSaving,
-  onSave,
-  styles,
-}) {
-  const { scrollOffsetY } = useModalSwipeScroll(110, visible);
-  return (
-    <Modal
-      isVisible={visible}
-      onBackdropPress={onClose}
-      onBackButtonPress={onClose}
-      onSwipeComplete={onClose}
-      swipeDirection={scrollOffsetY <= 0 ? ['down'] : undefined}
-      propagateSwipe={true}
-      animationIn="slideInUp"
-      animationOut="slideOutDown"
-      style={{ margin: 0, justifyContent: 'flex-end' }}
-    >
-      <KeyboardAvoidingView
-        style={styles.pwSheetOverlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
-        <View style={styles.pwSheet}>
-          <View style={styles.pwSheetHandle} />
-          <Text style={styles.pwSheetTitle}>Vincular Intervals.icu</Text>
-          <Text style={styles.pwSheetSubtitle}>
-            Ingresa tu ID de atleta y API Key para sincronizar datos.
-          </Text>
-
-          <Text style={styles.pwLabel}>ID de atleta (Athlete ID)</Text>
-          <Input
-            value={idExterno}
-            onChangeText={setIdExterno}
-            placeholder="Ej: 12345"
-            keyboardType="numeric"
-            autoCapitalize="none"
-            style={{ marginBottom: 16 }}
-          />
-
-          <Text style={styles.pwLabel}>API Key</Text>
-          <Input
-            value={apiKeyIntervalos}
-            onChangeText={setApiKeyIntervalos}
-            placeholder="Tu API Key de Intervals.icu"
-            secureTextEntry
-            autoCapitalize="none"
-            error={!!error}
-            errorText={error}
-            style={{ marginBottom: 16 }}
-          />
-
-          <View style={styles.pwActions}>
-            <Button
-              title="Cancelar"
-              variant="secondary"
-              onPress={onClose}
-              disabled={isSaving}
-              style={styles.pwCancelBtn}
-            />
-            <Button
-              title="Guardar credenciales"
-              variant="primary"
-              onPress={onSave}
-              loading={isSaving}
-              disabled={isSaving}
-              style={styles.pwSaveBtn}
-            />
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Change Password Bottom Sheet
+// Change Password Bottom Sheet — Estilo unificado con BiometriaSheet
 // ─────────────────────────────────────────────────────────────
 function ChangePasswordSheet({
   visible,
@@ -140,7 +61,17 @@ function ChangePasswordSheet({
 }) {
   const [showNew, setShowNew] = React.useState(false);
   const [showConfirm, setShowConfirm] = React.useState(false);
-  const { scrollOffsetY } = useModalSwipeScroll(110, visible);
+  const SWIPE_HEADER_HEIGHT = 100;
+  const {
+    scrollViewRef,
+    scrollOffsetY,
+    propagateSwipe,
+    scrollTo,
+    onScroll,
+  } = useModalSwipeScroll(SWIPE_HEADER_HEIGHT, visible);
+
+  const insets = useSafeAreaInsets();
+  const eyeBtnStyle = { paddingHorizontal: 14, paddingVertical: 14 };
 
   return (
     <Modal
@@ -149,68 +80,81 @@ function ChangePasswordSheet({
       onBackButtonPress={onClose}
       onSwipeComplete={onClose}
       swipeDirection={scrollOffsetY <= 0 ? ['down'] : undefined}
-      propagateSwipe={true}
+      propagateSwipe={propagateSwipe}
+      scrollTo={scrollTo}
+      scrollOffset={scrollOffsetY}
+      scrollOffsetMax={0}
       animationIn="slideInUp"
       animationOut="slideOutDown"
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+      style={[getSheetModalStyle()]}
+      {...getSheetModalProps()}
     >
       <KeyboardAvoidingView
-        style={styles.pwSheetOverlay}
+        style={styles.sheetOverlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
-        <View style={styles.pwSheet}>
-          <View style={styles.pwSheetHandle} />
-          <Text style={styles.pwSheetTitle}>Cambiar Contraseña</Text>
-          <Text style={styles.pwSheetSubtitle}>
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 34) }]}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>Cambiar contraseña</Text>
+          <Text style={styles.sheetSubtitle}>
             Tu nueva contraseña debe tener al menos 6 caracteres.
           </Text>
 
-          <Text style={styles.pwLabel}>Nueva Contraseña</Text>
-          <Input
-            value={newPassword}
-            onChangeText={setNewPassword}
-            placeholder="••••••••"
-            secureTextEntry={!showNew}
-            autoCapitalize="none"
-            error={!!passwordError}
-            rightAccessory={
-              <TouchableOpacity style={styles.pwEyeBtn} onPress={() => setShowNew((v) => !v)}>
-                {showNew ? <EyeOff color="#555" size={20} /> : <Eye color="#555" size={20} />}
-              </TouchableOpacity>
-            }
-            style={{ marginBottom: 16 }}
-          />
-
-          <Text style={styles.pwLabel}>Confirmar Contraseña</Text>
-          <Input
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            placeholder="••••••••"
-            secureTextEntry={!showConfirm}
-            autoCapitalize="none"
-            error={!!passwordError}
-            errorText={passwordError}
-            rightAccessory={
-              <TouchableOpacity style={styles.pwEyeBtn} onPress={() => setShowConfirm((v) => !v)}>
-                {showConfirm ? <EyeOff color="#555" size={20} /> : <Eye color="#555" size={20} />}
-              </TouchableOpacity>
-            }
-            style={{ marginBottom: 16 }}
-          />
-
-          {!!passwordError && <Text style={styles.pwErrorText}>{passwordError}</Text>}
-
-          <View style={styles.pwActions}>
-            <Button
-              title="Guardar Cambios"
-              variant="primary"
-              onPress={onSave}
-              loading={isUpdating}
-              disabled={isUpdating}
-              style={[styles.pwSaveBtn, { flex: 1 }]}
+          <ScrollView
+            ref={scrollViewRef}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+            decelerationRate="fast"
+            keyboardShouldPersistTaps="handled"
+            overScrollMode="never"
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+          >
+            <Text style={styles.sheetLabel}>Nueva contraseña *</Text>
+            <Input
+              value={newPassword}
+              onChangeText={setNewPassword}
+              placeholder="••••••••"
+              secureTextEntry={!showNew}
+              autoCapitalize="none"
+              error={!!passwordError}
+              rightAccessory={
+                <TouchableOpacity style={eyeBtnStyle} onPress={() => setShowNew((v) => !v)}>
+                  {showNew ? <EyeOff color="#555" size={20} /> : <Eye color="#555" size={20} />}
+                </TouchableOpacity>
+              }
+              style={{ marginBottom: 16 }}
             />
-          </View>
+
+            <Text style={styles.sheetLabel}>Confirmar contraseña *</Text>
+            <Input
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              placeholder="••••••••"
+              secureTextEntry={!showConfirm}
+              autoCapitalize="none"
+              error={!!passwordError}
+              errorText={passwordError}
+              rightAccessory={
+                <TouchableOpacity style={eyeBtnStyle} onPress={() => setShowConfirm((v) => !v)}>
+                  {showConfirm ? <EyeOff color="#555" size={20} /> : <Eye color="#555" size={20} />}
+                </TouchableOpacity>
+              }
+              style={{ marginBottom: 16 }}
+            />
+
+            <View style={styles.sheetActions}>
+              <Button
+                title="Guardar cambios"
+                variant="solid"
+                onPress={onSave}
+                loading={isUpdating}
+                disabled={isUpdating}
+                style={[styles.sheetSaveBtn, { flex: 1 }]}
+              />
+            </View>
+          </ScrollView>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -246,9 +190,15 @@ export function PerfilView({
   handleUpdateContacto,
   handleDeleteContacto,
   handleLogout,
+  handleStravaAuthSuccess,
   handleVincularIntervalos,
   codigoVinculacion,
   handlePlatformPress,
+  handleDisconnect,
+  handleCloseDisconnectModal,
+  handleConfirmDisconnect,
+  platformToDisconnect,
+  disconnectingPlatform,
   handleCopyCodigo,
   handleShareCodigo,
   showIntervalosSheet,
@@ -262,10 +212,20 @@ export function PerfilView({
   handleGuardarIntervalos,
   codigoIngresado,
   handleCodigoIngresadoChange,
-  handleVincularConCodigo,
+  handleBuscarCodigo,
+  previewVinculado,
+  buscarLoading,
+  onClosePreview,
+  onConfirmVinculacion,
   vincularLoading,
   vincularError,
-  relacionesActivas,
+  relacionesEntrenadores,
+  relacionesTutores,
+  relacionToDesvincular,
+  onDesvincular,
+  onCloseDesvincularModal,
+  onConfirmDesvincular,
+  desvincularLoading,
   showPasswordSheet,
   newPassword,
   setNewPassword,
@@ -288,8 +248,16 @@ export function PerfilView({
 }) {
   const { scrollHandler, HEADER_MAX_HEIGHT, interpolations, insets } = useCollapsibleHeader({ compact: true });
   const displayNombre = profileData?.nombre || nombre;
+  const scrollRef = useRef(null);
+  const [vinculacionSectionY, setVinculacionSectionY] = useState(0);
 
-  const isAnySheetVisible = showBiometriaSheet || showNotificacionesSheet || showIntervalosSheet || showPasswordSheet;
+  const handleCodigoInputFocus = useCallback(() => {
+    const offset = Math.max(0, vinculacionSectionY - 60);
+    const scroll = scrollRef.current?.scrollTo ? scrollRef.current : scrollRef.current?.getNode?.();
+    scroll?.scrollTo?.({ y: offset, animated: true });
+  }, [vinculacionSectionY]);
+
+  const isAnySheetVisible = showBiometriaSheet || showNotificacionesSheet || showIntervalosSheet || showPasswordSheet || !!platformToDisconnect || !!previewVinculado || !!relacionToDesvincular;
   useNavigationBarColor(isAnySheetVisible, '#131313', '#121212');
 
   return (
@@ -309,13 +277,21 @@ export function PerfilView({
         interpolations={interpolations}
         insets={insets}
       />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? HEADER_MAX_HEIGHT : 0}
+      >
       <Animated.ScrollView
+        ref={scrollRef}
         bounces={false}
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingTop: HEADER_MAX_HEIGHT }]}
         showsVerticalScrollIndicator={false}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         {/* Social ID Card (tarjeta crédito / licencia deportiva) */}
         <UserIdCard
@@ -346,24 +322,41 @@ export function PerfilView({
           styles={styles}
         />
 
-        {/* 6. Integraciones (Intervals, Strava, Garmin, Wahoo; badge estado; tap → flujo) */}
+        {/* 6. Conexiones de Datos (Strava, Intervals.icu) */}
         <IntegracionesSection
           integraciones={profileData?.integraciones}
           onPlatformPress={handlePlatformPress}
+          onStravaAuthSuccess={handleStravaAuthSuccess}
+          onDisconnect={handleDisconnect}
+          disconnectingPlatform={disconnectingPlatform}
+          showToast={showToast}
           styles={styles}
         />
 
         {/* 7. Mi entrenador / Vinculación (relaciones_usuarios) */}
+        <View onLayout={(e) => setVinculacionSectionY(e.nativeEvent.layout.y)}>
         <EntrenadorSection
           rol={rol}
-          relacionesActivas={relacionesActivas}
+          relacionesEntrenadores={relacionesEntrenadores}
+          relacionesTutores={relacionesTutores}
           codigoIngresado={codigoIngresado}
           onCodigoIngresadoChange={handleCodigoIngresadoChange}
-          onVincularConCodigo={handleVincularConCodigo}
+          onCodigoInputFocus={handleCodigoInputFocus}
+          onBuscarCodigo={handleBuscarCodigo}
+          previewVinculado={previewVinculado}
+          buscarLoading={buscarLoading}
+          onClosePreview={onClosePreview}
+          onConfirmVinculacion={onConfirmVinculacion}
           vincularLoading={vincularLoading}
           vincularError={vincularError}
+          relacionToDesvincular={relacionToDesvincular}
+          onDesvincular={onDesvincular}
+          onCloseDesvincularModal={onCloseDesvincularModal}
+          onConfirmDesvincular={onConfirmDesvincular}
+          desvincularLoading={desvincularLoading}
           styles={styles}
         />
+        </View>
 
         {/* 8. Seguridad */}
         <View style={styles.card}>
@@ -387,6 +380,7 @@ export function PerfilView({
           <Text style={[styles.buttonText, styles.buttonLogoutText]}>Cerrar sesión</Text>
         </TouchableOpacity>
       </Animated.ScrollView>
+      </KeyboardAvoidingView>
 
       {/* BottomSheets: edición delegada (handlers en usePerfil, refreshUserData tras guardar) */}
       <BiometriaSheet
@@ -421,7 +415,7 @@ export function PerfilView({
       />
 
       {/* Modals */}
-      <IntervalsSheet
+      <IntervalsConnectSheet
         visible={showIntervalosSheet}
         onClose={handleCerrarIntervalosSheet}
         idExterno={idExterno}
@@ -431,7 +425,6 @@ export function PerfilView({
         error={intervalosError}
         isSaving={isSavingIntervalos}
         onSave={handleGuardarIntervalos}
-        styles={styles}
       />
 
       <ChangePasswordSheet
@@ -446,6 +439,121 @@ export function PerfilView({
         onSave={handleGuardarContrasena}
         styles={styles}
       />
+
+      {/* Modal confirmar desvincular (estilo XERPA) */}
+      <Modal
+        isVisible={!!platformToDisconnect}
+        onBackdropPress={handleCloseDisconnectModal}
+        onBackButtonPress={handleCloseDisconnectModal}
+        avoidKeyboard
+        backdropOpacity={0.6}
+        style={[confirmModalStyles.modal, getCenteredModalStyle()]}
+        {...getSheetModalProps()}
+      >
+        <View style={confirmModalStyles.box}>
+          <Text style={confirmModalStyles.title}>Desvincular</Text>
+          <Text style={confirmModalStyles.message}>
+            {platformToDisconnect === 'strava' && '¿Desvincular Strava? Perderás el acceso a tus datos de entrenamiento recientes.'}
+            {platformToDisconnect === 'intervals' && '¿Desvincular Intervals.icu? Perderás el acceso a tus datos de entrenamiento recientes.'}
+          </Text>
+          <View style={confirmModalStyles.actions}>
+            <Button
+              title="Cancelar"
+              variant="secondary"
+              onPress={handleCloseDisconnectModal}
+              disabled={!!disconnectingPlatform}
+              style={confirmModalStyles.cancelBtn}
+            />
+            <Button
+              title="Desvincular"
+              variant="danger"
+              onPress={handleConfirmDisconnect}
+              loading={!!disconnectingPlatform}
+              disabled={!!disconnectingPlatform}
+              style={confirmModalStyles.dangerBtn}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Bottom Sheet: preview entrenador/tutor al buscar por código */}
+      <EntrenadorPreviewSheet
+        visible={!!previewVinculado}
+        onClose={onClosePreview}
+        preview={previewVinculado}
+        onConfirm={onConfirmVinculacion}
+        loading={!!vincularLoading}
+        error={vincularError || null}
+      />
+
+      {/* Modal confirmar desvincular entrenador/tutor */}
+      <Modal
+        isVisible={!!relacionToDesvincular}
+        onBackdropPress={onCloseDesvincularModal}
+        onBackButtonPress={onCloseDesvincularModal}
+        avoidKeyboard
+        backdropOpacity={0.6}
+        style={[confirmModalStyles.modal, getCenteredModalStyle()]}
+        {...getSheetModalProps()}
+      >
+        <View style={[confirmModalStyles.box, confirmModalStyles.boxDanger]}>
+          <Text style={confirmModalStyles.title}>Desvincular</Text>
+          <Text style={confirmModalStyles.message}>
+            {relacionToDesvincular
+              ? `¿Desvincular a ${relacionToDesvincular.vinculado?.nombre || 'este contacto'}?`
+              : ''}
+          </Text>
+          <View style={confirmModalStyles.actions}>
+            <Button
+              title="Cancelar"
+              variant="secondary"
+              onPress={onCloseDesvincularModal}
+              disabled={!!desvincularLoading}
+              style={confirmModalStyles.cancelBtn}
+            />
+            <Button
+              title="Desvincular"
+              variant="danger"
+              onPress={onConfirmDesvincular}
+              loading={!!desvincularLoading}
+              disabled={!!desvincularLoading}
+              style={confirmModalStyles.dangerBtn}
+            />
+          </View>
+        </View>
+      </Modal>
     </ScreenWrapper>
   );
 }
+
+const confirmModalStyles = StyleSheet.create({
+  modal: { justifyContent: 'center', alignItems: 'center', margin: 24 },
+  box: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 340,
+    borderWidth: 1,
+    borderColor: 'rgba(255,82,82,0.3)',
+  },
+  boxDanger: { borderColor: 'rgba(255,82,82,0.4)' },
+  title: { fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 8 },
+  message: { fontSize: 15, color: '#aaa', marginBottom: 24 },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(0,240,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  avatarText: { color: '#00F0FF', fontSize: 24, fontWeight: '800' },
+  subtitle: { fontSize: 13, color: '#666', marginBottom: 12 },
+  errorText: { fontSize: 13, color: '#ff5252', marginBottom: 8, textAlign: 'center' },
+  actions: { flexDirection: 'row', gap: 12 },
+  cancelBtn: { flex: 1 },
+  dangerBtn: { flex: 1 },
+  confirmBtn: { flex: 1 },
+});

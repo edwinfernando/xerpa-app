@@ -22,6 +22,8 @@ import { Input } from '../ui/Input';
 import { useToast } from '../../context/ToastContext';
 import { useNavigation } from '@react-navigation/native';
 import { useModalSwipeScroll } from '../../hooks/useModalSwipeScroll';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getSheetModalStyle, getSheetModalProps } from '../../constants/sheetModalConfig';
 import { theme } from '../../theme/theme';
 import { useAdaptiveSheetHeight } from '../../hooks/useAdaptiveSheetHeight';
 
@@ -53,6 +55,7 @@ export function PastRaceResultSheet({
     onScroll,
   } = useModalSwipeScroll(SWIPE_HEADER_HEIGHT, visible);
 
+  const insets = useSafeAreaInsets();
   const hasStoredResult = !!(carrera?.posicion != null || carrera?.notas?.trim());
   const {
     minSheetHeight: MIN_SHEET_HEIGHT,
@@ -137,7 +140,8 @@ export function PastRaceResultSheet({
       scrollOffsetMax={0}
       animationIn="slideInUp"
       animationOut="slideOutDown"
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+      style={[getSheetModalStyle()]}
+      {...getSheetModalProps()}
     >
       <View style={styles.sheetOverlay}>
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={handleClose} />
@@ -152,6 +156,7 @@ export function PastRaceResultSheet({
                 height: computedSheetHeight,
                 minHeight: MIN_SHEET_HEIGHT,
                 maxHeight: MAX_SHEET_HEIGHT,
+                paddingBottom: Math.max(insets.bottom, 16),
               },
             ]}
           >

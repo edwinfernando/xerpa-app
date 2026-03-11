@@ -30,8 +30,14 @@ export default function PerfilScreen({ user }) {
     handleUpdateContacto,
     handleDeleteContacto,
     handleLogout,
+    handleStravaAuthSuccess,
     handleVincularIntervalos,
     handlePlatformPress,
+    handleDisconnect,
+    handleCloseDisconnectModal,
+    handleConfirmDisconnect,
+    platformToDisconnect,
+    disconnectingPlatform,
     codigoVinculacion,
     handleCopyCodigo,
     handleShareCodigo,
@@ -45,11 +51,22 @@ export default function PerfilScreen({ user }) {
     handleCerrarIntervalosSheet,
     handleGuardarIntervalos,
     codigoIngresado,
+    setCodigoIngresado,
     handleCodigoIngresadoChange,
-    handleVincularConCodigo,
+    handleBuscarCodigo,
+    previewVinculado,
+    buscarLoading,
+    handleClosePreviewVinculacion,
+    handleConfirmVinculacion,
     vincularLoading,
     vincularError,
-    relacionesActivas,
+    relacionesEntrenadores,
+    relacionesTutores,
+    relacionToDesvincular,
+    handleDesvincular,
+    handleCloseDesvincularModal,
+    handleConfirmDesvincular,
+    desvincularLoading,
     showPasswordSheet,
     newPassword,
     setNewPassword,
@@ -97,8 +114,14 @@ export default function PerfilScreen({ user }) {
       handleUpdateContacto={handleUpdateContacto}
       handleDeleteContacto={handleDeleteContacto}
       handleLogout={handleLogout}
+      handleStravaAuthSuccess={handleStravaAuthSuccess}
       handleVincularIntervalos={handleVincularIntervalos}
       handlePlatformPress={handlePlatformPress}
+      handleDisconnect={handleDisconnect}
+      handleCloseDisconnectModal={handleCloseDisconnectModal}
+      handleConfirmDisconnect={handleConfirmDisconnect}
+      platformToDisconnect={platformToDisconnect}
+      disconnectingPlatform={disconnectingPlatform}
     codigoVinculacion={codigoVinculacion}
     handleCopyCodigo={handleCopyCodigo}
     handleShareCodigo={handleShareCodigo}
@@ -113,10 +136,20 @@ export default function PerfilScreen({ user }) {
       handleGuardarIntervalos={handleGuardarIntervalos}
       codigoIngresado={codigoIngresado}
       handleCodigoIngresadoChange={handleCodigoIngresadoChange}
-      handleVincularConCodigo={handleVincularConCodigo}
+      handleBuscarCodigo={handleBuscarCodigo}
+      previewVinculado={previewVinculado}
+      buscarLoading={buscarLoading}
+      onClosePreview={handleClosePreviewVinculacion}
+      onConfirmVinculacion={handleConfirmVinculacion}
       vincularLoading={vincularLoading}
       vincularError={vincularError}
-      relacionesActivas={relacionesActivas}
+      relacionesEntrenadores={relacionesEntrenadores}
+      relacionesTutores={relacionesTutores}
+      relacionToDesvincular={relacionToDesvincular}
+      onDesvincular={handleDesvincular}
+      onCloseDesvincularModal={handleCloseDesvincularModal}
+      onConfirmDesvincular={handleConfirmDesvincular}
+      desvincularLoading={desvincularLoading}
       showPasswordSheet={showPasswordSheet}
       newPassword={newPassword}
       setNewPassword={setNewPassword}

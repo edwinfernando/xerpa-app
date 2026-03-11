@@ -20,14 +20,16 @@ export const HEADER_CONTENT_MAX_COMPACT = 110;
 export const HEADER_CONTENT_MIN = 60;
 
 export function useCollapsibleHeader(options = {}) {
-  const { compact = false } = options;
+  const { compact = false, hideOnScroll = false } = options;
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const contentMax = compact ? HEADER_CONTENT_MAX_COMPACT : HEADER_CONTENT_MAX;
-  const SCROLL_RANGE = contentMax - HEADER_CONTENT_MIN;
+  const SCROLL_RANGE = hideOnScroll
+    ? contentMax * 5
+    : contentMax - HEADER_CONTENT_MIN;
   const HEADER_MAX_HEIGHT = insets.top + contentMax;
-  const HEADER_MIN_HEIGHT = insets.top + HEADER_CONTENT_MIN;
+  const HEADER_MIN_HEIGHT = hideOnScroll ? 0 : insets.top + HEADER_CONTENT_MIN;
 
   const interpolations = useMemo(() => {
     // diffClamp: scrollY < 0 → 0 (header fijo en MAX, sin estirar); scrollY > SCROLL_RANGE → SCROLL_RANGE

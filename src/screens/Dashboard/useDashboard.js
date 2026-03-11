@@ -1,18 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { AppState, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { AppState, LayoutAnimation, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { supabase } from '../../../supabase';
 import { useUserContext } from '../../context/UserContext';
 import { useToast } from '../../context/ToastContext';
-
-if (
-  Platform.OS === 'android'
-  && !global?.nativeFabricUIManager
-  && UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 import { saveTodayPlan } from '../../services/offlineStorage';
 import { syncPendingEfforts } from '../../services/effortSync';
 import { MOTIVATIONAL_PHRASES } from '../../constants/phrases';

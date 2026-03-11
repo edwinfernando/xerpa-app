@@ -9,6 +9,7 @@
  * @property {string} id - UUID del plan
  * @property {string} user_id - UUID del atleta (FK usuarios)
  * @property {string} fecha - Fecha en formato AAAA-MM-DD
+ * @property {string} [semana_inicio] - Lunes de la semana (YYYY-MM-DD). Auto-rellenado por trigger.
  * @property {string} [tipo] - Ej: Ride, Run, Strength, Rest, Walk
  * @property {string} [titulo]
  * @property {string} [detalle] - Instrucciones del entreno

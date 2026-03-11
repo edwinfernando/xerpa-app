@@ -16,6 +16,7 @@ import {
   Alert,
   Image,
   Platform,
+  Share,
   useWindowDimensions,
 } from 'react-native';
 import Modal from 'react-native-modal';
@@ -31,11 +32,15 @@ import {
   Info,
   Package,
   Trophy,
+  Share2,
 } from 'lucide-react-native';
 import { formatDateRange } from '../../../utils/formatDateRange';
+import { PLAY_STORE_URL, IOS_APP_STORE_URL } from '../../../constants/appUrls';
 import { showXerpaError } from '../../../utils/ErrorHandler';
 import { computeXerpaReadinessPct } from '../../../utils/raceReadiness';
 import { useModalSwipeScroll } from '../../../hooks/useModalSwipeScroll';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getSheetModalStyle, getSheetModalProps } from '../../../constants/sheetModalConfig';
 
 function DificultadBadge({ nivel, styles }) {
   const n = nivel != null ? Number(nivel) : null;
@@ -134,6 +139,7 @@ export function RaceDetailSheet({
     onScroll,
   } = useModalSwipeScroll(SWIPE_HEADER_HEIGHT, visible);
 
+  const insets = useSafeAreaInsets();
   const SHEET_BG = '#1A1A1A';
   const MAX_SHEET_HEIGHT = Math.floor(screenHeight * 0.9);
   const MIN_SHEET_HEIGHT = 340;
@@ -196,6 +202,42 @@ export function RaceDetailSheet({
     Alert.alert('Coordenadas copiadas', coords);
   }
 
+  function buildShareRaceText() {
+    const lines = [];
+    lines.push(`🏁 ${carrera?.nombre ?? 'Carrera'}`);
+    if (circuitoNombre || carrera?.ciudad) {
+      lines.push([circuitoNombre, carrera?.ciudad, carrera?.pais].filter(Boolean).join(' · '));
+    }
+    lines.push(`📅 ${formatDateRange(carrera?.fecha_inicio, carrera?.fecha_fin)}`);
+    if (carrera?.distancia_km != null) lines.push(`📍 ${carrera.distancia_km} km`);
+    if (carrera?.desnivel_m != null) lines.push(`⛰ ${carrera.desnivel_m} m D+`);
+    if (hasLocation) {
+      lines.push(`🗺 ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      lines.push(getMapsUrl());
+    }
+    if (urlInscripcion) lines.push(`\nInscripción: ${urlInscripcion}`);
+    const carreraId = carrera?.id ?? carrera?.carrera_id;
+    lines.push('\nDescubre más carreras en XERPA');
+    if (carreraId) {
+      lines.push(`xerpa://carreras/race/${carreraId}`);
+      lines.push('Descarga la app:');
+      lines.push(`Android: ${PLAY_STORE_URL}`);
+      if (IOS_APP_STORE_URL) lines.push(`iOS: ${IOS_APP_STORE_URL}`);
+    }
+    return lines.filter(Boolean).join('\n');
+  }
+
+  async function handleShareCarrera() {
+    try {
+      await Share.share({
+        message: buildShareRaceText(),
+        title: `${carrera?.nombre ?? 'Carrera'} — XERPA`,
+      });
+    } catch (err) {
+      if (err?.message?.includes('User did not share')) return;
+    }
+  }
+
   async function handleInscribirme() {
     if (urlInscripcion) {
       const supported = await Linking.canOpenURL(urlInscripcion);
@@ -245,7 +287,8 @@ export function RaceDetailSheet({
       scrollOffsetMax={0}
       animationIn="slideInUp"
       animationOut="slideOutDown"
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+      style={[getSheetModalStyle()]}
+      {...getSheetModalProps()}
     >
       <View style={styles.sheetOverlay}>
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={handleRequestClose} />
@@ -257,6 +300,7 @@ export function RaceDetailSheet({
               maxHeight: MAX_SHEET_HEIGHT,
               minHeight: MIN_SHEET_HEIGHT,
               height: computedSheetHeight,
+              paddingBottom: Math.max(insets.bottom, 16),
             },
           ]}
         >
@@ -268,11 +312,21 @@ export function RaceDetailSheet({
             }}
           >
             <View style={[styles.sheetHandle, { backgroundColor: '#E5E5EA' }]} />
-            <View style={styles.sheetTitleRow}>
-              <Trophy color="#00F0FF" size={20} />
-              <Text style={styles.sheetTitle} numberOfLines={2}>
-                {carrera.nombre ?? 'Carrera'}
-              </Text>
+            <View style={styles.sheetHeaderRow}>
+              <View style={styles.sheetTitleRow}>
+                <Trophy color="#00F0FF" size={20} />
+                <Text style={styles.sheetTitle} numberOfLines={2}>
+                  {carrera.nombre ?? 'Carrera'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.sheetHeaderShareBtn}
+                onPress={handleShareCarrera}
+                activeOpacity={0.8}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Share2 color="#00D2FF" size={20} strokeWidth={2} />
+              </TouchableOpacity>
             </View>
             <Text style={styles.sheetSubtitle}>
               {circuitoNombre || carrera.ciudad
@@ -402,11 +456,12 @@ export function RaceDetailSheet({
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.detailUrlLink, { marginTop: 10 }]}
+                  style={styles.detailVerMapaButton}
                   onPress={handleOpenLocation}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.detailUrlLinkText}>Ver en mapa</Text>
-                  <ExternalLink color="#00F0FF" size={14} />
+                  <MapPin color="#00D2FF" size={20} strokeWidth={2} />
+                  <Text style={styles.detailVerMapaButtonText}>Ver mapa</Text>
                 </TouchableOpacity>
                 </>
               ) : (

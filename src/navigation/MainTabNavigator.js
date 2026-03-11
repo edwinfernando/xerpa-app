@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { LayoutDashboard, Calendar, User, Trophy } from 'lucide-react-native';
 import DashboardScreen from '../screens/Dashboard';
 import PlanScreen from '../screens/Plan';
@@ -175,23 +175,33 @@ export function MainTabNavigator({ user, initialTab, onboardingParams, onOnboard
   const tabBarHeight = TAB_BAR_BASE_HEIGHT + insets.bottom;
   const tabBarPaddingBottom = insets.bottom > 0 ? insets.bottom : 16;
 
+  const screenOptions = ({ route }) => {
+    const focusedRouteName = getFocusedRouteNameFromRoute(route) ?? route.name;
+    const hideTabBar =
+      focusedRouteName === 'AddPlan' ||
+      focusedRouteName === 'AddRace' ||
+      focusedRouteName === 'AddRaceMapPicker';
+    return {
+      headerShown: false,
+      tabBarStyle: {
+        backgroundColor: 'rgba(30, 30, 30, 0.9)',
+        borderTopColor: 'transparent',
+        borderTopWidth: 0,
+        height: tabBarHeight,
+        paddingBottom: tabBarPaddingBottom,
+        paddingTop: 8,
+        display: hideTabBar ? 'none' : 'flex',
+      },
+      tabBarActiveTintColor: '#00F0FF',
+      tabBarInactiveTintColor: '#8E8E93',
+      tabBarShowLabel: false,
+    };
+  };
+
   return (
     <Tab.Navigator
       initialRouteName={initialTab || 'Dashboard'}
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: 'rgba(30, 30, 30, 0.9)',
-          borderTopColor: 'transparent',
-          borderTopWidth: 0,
-          height: tabBarHeight,
-          paddingBottom: tabBarPaddingBottom,
-          paddingTop: 8,
-        },
-        tabBarActiveTintColor: '#00F0FF',
-        tabBarInactiveTintColor: '#8E8E93',
-        tabBarShowLabel: false,
-      }}
+      screenOptions={screenOptions}
     >
       <Tab.Screen
         name="Dashboard"
@@ -235,7 +245,7 @@ export function MainTabNavigator({ user, initialTab, onboardingParams, onOnboard
           tabBarIcon: ({ color, size }) => <Trophy color={color} size={size} />,
         }}
       >
-        {() => <RaceCalendarScreen user={user} />}
+        {({ route }) => <RaceCalendarScreen user={user} route={route} />}
       </Tab.Screen>
 
       <Tab.Screen

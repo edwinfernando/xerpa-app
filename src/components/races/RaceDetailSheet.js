@@ -17,6 +17,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   StyleSheet,
+  Share,
   useWindowDimensions,
 } from 'react-native';
 import Modal from 'react-native-modal';
@@ -34,14 +35,19 @@ import {
   Info,
   Package,
   Trophy,
+  Share2,
+  Copy,
 } from 'lucide-react-native';
 import { formatDateRange } from '../../utils/formatDateRange';
+import { PLAY_STORE_URL, IOS_APP_STORE_URL } from '../../constants/appUrls';
 import { showXerpaError } from '../../utils/ErrorHandler';
 import { useToast } from '../../context/ToastContext';
 import { computeXerpaReadinessPct } from '../../utils/raceReadiness';
 import { getProgressColorByPct } from '../../utils/colors';
 import { useModalSwipeScroll } from '../../hooks/useModalSwipeScroll';
 import { useAdaptiveSheetHeight } from '../../hooks/useAdaptiveSheetHeight';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getSheetModalStyle, getSheetModalProps } from '../../constants/sheetModalConfig';
 
 function DificultadBadge({ nivel, styles }) {
   const n = nivel != null ? Number(nivel) : null;
@@ -131,6 +137,7 @@ export function RaceDetailSheet({
     onScroll,
   } = useModalSwipeScroll(SWIPE_HEADER_HEIGHT, visible);
 
+  const insets = useSafeAreaInsets();
   const SHEET_BG = '#1C1C1E';
   const {
     minSheetHeight: MIN_SHEET_HEIGHT,
@@ -269,6 +276,68 @@ export function RaceDetailSheet({
     });
   }
 
+  async function handleShareCoords() {
+    if (!hasLocation) return;
+    const coords = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    const mapsUrl = getMapsUrl();
+    try {
+      await Share.share({
+        message: mapsUrl
+          ? `Ubicación: ${coords}\n\nVer en mapa: ${mapsUrl}`
+          : coords,
+        title: 'Coordenadas de la carrera',
+      });
+    } catch (err) {
+      if (err?.message?.includes('User did not share')) return;
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'No se pudo compartir.',
+      });
+    }
+  }
+
+  function buildShareRaceText() {
+    const lines = [];
+    lines.push(`🏁 ${carrera?.nombre ?? 'Carrera'}`);
+    if (circuitoNombre || carrera?.ciudad) {
+      lines.push([circuitoNombre, carrera?.ciudad, carrera?.pais].filter(Boolean).join(' · '));
+    }
+    lines.push(`📅 ${formatDateRange(carrera?.fecha_inicio, carrera?.fecha_fin)}`);
+    if (carrera?.distancia_km != null) lines.push(`📍 ${carrera.distancia_km} km`);
+    if (carrera?.desnivel_m != null) lines.push(`⛰ ${carrera.desnivel_m} m D+`);
+    if (hasLocation) {
+      lines.push(`🗺 ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      lines.push(getMapsUrl());
+    }
+    if (urlInscripcion) lines.push(`\nInscripción: ${urlInscripcion}`);
+    const carreraId = carrera?.id ?? carrera?.carrera_id;
+    lines.push('\nDescubre más carreras en XERPA');
+    if (carreraId) {
+      lines.push(`xerpa://carreras/race/${carreraId}`);
+      lines.push('Descarga la app:');
+      lines.push(`Android: ${PLAY_STORE_URL}`);
+      if (IOS_APP_STORE_URL) lines.push(`iOS: ${IOS_APP_STORE_URL}`);
+    }
+    return lines.filter(Boolean).join('\n');
+  }
+
+  async function handleShareCarrera() {
+    try {
+      await Share.share({
+        message: buildShareRaceText(),
+        title: `${carrera?.nombre ?? 'Carrera'} — XERPA`,
+      });
+    } catch (err) {
+      if (err?.message?.includes('User did not share')) return;
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: 'No se pudo compartir la carrera.',
+      });
+    }
+  }
+
   async function handleInscribirme() {
     if (hasCategoryOptions && !selectedCategoryId) {
       showToast({
@@ -335,7 +404,8 @@ export function RaceDetailSheet({
       scrollOffsetMax={0}
       animationIn="slideInUp"
       animationOut="slideOutDown"
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+      style={[getSheetModalStyle()]}
+      {...getSheetModalProps()}
     >
       <View style={styles.sheetOverlay}>
         <View
@@ -346,16 +416,27 @@ export function RaceDetailSheet({
               height: computedSheetHeight,
               minHeight: MIN_SHEET_HEIGHT,
               maxHeight: MAX_SHEET_HEIGHT,
+              paddingBottom: Math.max(insets.bottom, 16),
             },
           ]}
         >
           {shouldRenderFloatingHeader && (
-            <View style={localStyles.floatingHeaderWrap}>
-              <View style={localStyles.titleRow}>
-                <Trophy color="#00F0FF" size={18} />
-                <Text style={styles.sheetTitle} numberOfLines={1}>
-                  {carrera.nombre ?? 'Carrera'}
-                </Text>
+            <View style={[localStyles.floatingHeaderWrap, { pointerEvents: 'box-none' }]}>
+              <View style={localStyles.floatingHeaderRow}>
+                <View style={localStyles.titleRow}>
+                  <Trophy color="#00F0FF" size={18} />
+                  <Text style={styles.sheetTitle} numberOfLines={1}>
+                    {carrera.nombre ?? 'Carrera'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={localStyles.headerShareBtn}
+                  onPress={handleShareCarrera}
+                  activeOpacity={0.8}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Share2 color="#00D2FF" size={20} strokeWidth={2} />
+                </TouchableOpacity>
               </View>
               <Text style={[styles.sheetSubtitle, localStyles.floatingSubtitle]} numberOfLines={1}>
                 {subtitleText}
@@ -380,6 +461,14 @@ export function RaceDetailSheet({
                       {carrera.nombre ?? 'Carrera'}
                     </Text>
                   </View>
+                  <TouchableOpacity
+                    style={localStyles.headerShareBtn}
+                    onPress={handleShareCarrera}
+                    activeOpacity={0.8}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Share2 color="#00D2FF" size={20} strokeWidth={2} />
+                  </TouchableOpacity>
                 </View>
                 <Text style={[styles.sheetSubtitle, localStyles.subtitle]}>
                   {subtitleText}
@@ -425,6 +514,14 @@ export function RaceDetailSheet({
                     end={{ x: 0.5, y: 1 }}
                     style={styles.detailHeroBottomFade}
                   />
+                  <TouchableOpacity
+                    style={localStyles.heroShareBtn}
+                    onPress={handleShareCarrera}
+                    activeOpacity={0.8}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Share2 color="#00D2FF" size={22} strokeWidth={2} />
+                  </TouchableOpacity>
                   <View style={styles.detailHeroTextOverlay}>
                     <View style={localStyles.heroTitleRow}>
                       <Trophy color="#00F0FF" size={18} />
@@ -607,25 +704,40 @@ export function RaceDetailSheet({
                 <Text style={styles.detailSectionBody}>
                   {locationLabel || 'Ubicación general de la carrera'}
                 </Text>
-                {hasLocation && (
-                  <TouchableOpacity
-                    onPress={handleCopyCoords}
-                    activeOpacity={0.8}
-                    style={{ marginTop: 6, alignSelf: 'flex-start' }}
-                  >
-                    <Text style={[styles.detailSectionBody, { color: '#8E8E93' }]}>
-                      {`${lat.toFixed(6)}, ${lng.toFixed(6)} · tocar para copiar`}
-                    </Text>
-                  </TouchableOpacity>
-                )}
                 {hasLocation ? (
-                  <TouchableOpacity
-                    style={[styles.detailUrlLink, { marginTop: 10 }]}
-                    onPress={handleOpenLocation}
-                  >
-                    <Text style={styles.detailUrlLinkText}>Ver en mapa</Text>
-                    <ExternalLink color="#00F0FF" size={14} />
-                  </TouchableOpacity>
+                  <>
+                    <View style={styles.detailCoordsRow}>
+                      <Text style={styles.detailCoordsLabel}>
+                        {lat.toFixed(6)}, {lng.toFixed(6)}
+                      </Text>
+                      <View style={styles.detailCoordsActions}>
+                        <TouchableOpacity
+                          style={styles.detailCoordsIconBtn}
+                          onPress={handleCopyCoords}
+                          activeOpacity={0.8}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Copy color="#00D2FF" size={18} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.detailCoordsIconBtn}
+                          onPress={handleShareCoords}
+                          activeOpacity={0.8}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Share2 color="#00D2FF" size={18} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.detailVerMapaButton}
+                      onPress={handleOpenLocation}
+                      activeOpacity={0.8}
+                    >
+                      <MapPin color="#00D2FF" size={20} strokeWidth={2} />
+                      <Text style={styles.detailVerMapaButtonText}>Ver mapa</Text>
+                    </TouchableOpacity>
+                  </>
                 ) : (
                   <Text style={[styles.detailSectionBody, { marginTop: 10, color: '#8E8E93' }]}>
                     Esta carrera no tiene coordenadas exactas todavía.
@@ -763,16 +875,30 @@ const localStyles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 5,
-    pointerEvents: 'none',
     backgroundColor: '#1C1C1E',
     borderRadius: 0,
     borderWidth: 0,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
+  floatingHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerShareBtn: {
+    padding: 6,
+  },
   floatingSubtitle: {
     paddingHorizontal: 0,
     marginTop: 2,
+  },
+  heroShareBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 16,
+    padding: 8,
+    zIndex: 4,
   },
   heroTitleRow: {
     flexDirection: 'row',

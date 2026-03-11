@@ -10,7 +10,9 @@ import {
   ScrollView,
 } from 'react-native';
 import Modal from 'react-native-modal';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useModalSwipeScroll } from '../../../hooks/useModalSwipeScroll';
+import { getSheetModalStyle, getSheetModalProps } from '../../../constants/sheetModalConfig';
 
 const SORT_OPTIONS = [
   { value: 'fecha_asc', label: 'Más Próximas' },
@@ -74,6 +76,7 @@ export function FilterBottomSheet({
     scrollTo,
     onScroll,
   } = useModalSwipeScroll(SWIPE_HEADER_HEIGHT, visible);
+  const insets = useSafeAreaInsets();
 
   const paises = filterOptions.paises || [];
   const deportes = filterOptions.deportes || [];
@@ -98,11 +101,12 @@ export function FilterBottomSheet({
       scrollOffsetMax={0}
       animationIn="slideInUp"
       animationOut="slideOutDown"
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+      style={[getSheetModalStyle()]}
+      {...getSheetModalProps()}
     >
       <View style={styles.sheetOverlay}>
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
-        <View style={styles.filterSheet}>
+        <View style={[styles.filterSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={[styles.sheetHandle, { backgroundColor: '#E5E5EA' }]} />
           <View style={styles.filterSheetHeader}>
             <Text style={styles.sheetTitle}>Filtros</Text>

@@ -15,6 +15,8 @@ import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { ROL_OPTIONS } from '../PerfilStyles';
 import { useModalSwipeScroll } from '../../../hooks/useModalSwipeScroll';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getSheetModalStyle, getSheetModalProps } from '../../../constants/sheetModalConfig';
 
 export function BiometriaSheet({
   visible,
@@ -46,6 +48,7 @@ export function BiometriaSheet({
     scrollTo,
     onScroll,
   } = useModalSwipeScroll(SWIPE_HEADER_HEIGHT, visible);
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal
@@ -60,14 +63,15 @@ export function BiometriaSheet({
       scrollOffsetMax={0}
       animationIn="slideInUp"
       animationOut="slideOutDown"
-      style={{ margin: 0, justifyContent: 'flex-end' }}
+      style={[getSheetModalStyle()]}
+      {...getSheetModalProps()}
     >
       <KeyboardAvoidingView
         style={styles.sheetOverlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 34) }]}>
           <View style={[styles.sheetHandle, { backgroundColor: '#E5E5EA' }]} />
           <Text style={styles.sheetTitle}>Información personal y biométrica</Text>
           <Text style={styles.sheetSubtitle}>Edita tus datos personales y biométricos.</Text>

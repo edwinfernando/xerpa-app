@@ -4,7 +4,7 @@ import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../../supabase';
 import { useUserContext } from '../../context/UserContext';
 import { useToast } from '../../context/ToastContext';
-import { vincularPorCodigo } from '../../services/relacionesService';
+import { vincularPorCodigo, buscarUsuarioPorCodigo, desvincular } from '../../services/relacionesService';
 import { upsertPreferenciasNotificaciones } from '../../services/preferenciasNotificacionesService';
 import { insertContactoEmergencia, updateContactoEmergencia, deleteContactoEmergencia } from '../../services/contactosEmergenciaService';
 
@@ -148,6 +148,11 @@ export function usePerfil(user) {
     showToast({ type: 'info', title: 'Próximamente', message: 'La vinculación con Strava estará disponible pronto.' });
   };
 
+  const handleStravaAuthSuccess = async () => {
+    await refreshUserData();
+    showToast({ type: 'success', title: '¡Vinculado! 🎯', message: 'Strava conectado correctamente.' });
+  };
+
   // ── Vincular Intervals.icu (upsert en integraciones_terceros) ───
   const integracionIntervals = Array.isArray(profileData?.integraciones)
     ? profileData.integraciones.find((i) => i.plataforma === 'intervals')
@@ -181,6 +186,42 @@ export function usePerfil(user) {
       handleVincularIntervalos();
     } else {
       showToast({ type: 'info', title: 'Próximamente', message: `${plataforma.charAt(0).toUpperCase() + plataforma.slice(1)} estará disponible pronto. OAuth o ingreso de credenciales en desarrollo.` });
+    }
+  };
+
+  // ── Desvincular integración (Strava, Intervals) — Modal de confirmación estilo XERPA ───
+  const [disconnectingPlatform, setDisconnectingPlatform] = useState(null);
+  const [platformToDisconnect, setPlatformToDisconnect] = useState(null);
+
+  const handleDisconnect = (plataforma) => {
+    setPlatformToDisconnect(plataforma);
+  };
+
+  const handleCloseDisconnectModal = () => {
+    setPlatformToDisconnect(null);
+  };
+
+  const handleConfirmDisconnect = async () => {
+    const plataforma = platformToDisconnect;
+    if (!plataforma || !user?.id) return;
+    const label = plataforma === 'strava' ? 'Strava' : 'Intervals.icu';
+    setDisconnectingPlatform(plataforma);
+    try {
+      // Soft delete: marcamos Inactiva para preservar credenciales (evita re-ingresar al reconectar)
+      const { error } = await supabase
+        .from('integraciones_terceros')
+        .update({ estado: 'Inactiva' })
+        .eq('usuario_id', user.id)
+        .eq('plataforma', plataforma);
+
+      if (error) throw error;
+      handleCloseDisconnectModal();
+      await refreshUserData();
+      showToast({ type: 'success', title: 'Desvinculado ✓', message: `${label} desconectado correctamente.` });
+    } catch (err) {
+      showToast({ type: 'error', title: 'Error', message: err?.message ?? 'No se pudo desvincular.' });
+    } finally {
+      setDisconnectingPlatform(null);
     }
   };
 
@@ -233,34 +274,80 @@ export function usePerfil(user) {
     }
   };
 
-  const codigoVinculacion = profileData?.codigo || null;
+  const codigoVinculacion = profileData?.codigo ?? null;
 
-  // ── Vincular con Entrenador/Tutor (insert en relaciones_usuarios) ───
+  // ── Vincular con Entrenador/Tutor (preview + confirmación + desvincular) ───
   const [codigoIngresado, setCodigoIngresado] = useState('');
   const [vincularLoading, setVincularLoading] = useState(false);
   const [vincularError, setVincularError] = useState('');
+  const [previewVinculado, setPreviewVinculado] = useState(null);
+  const [buscarLoading, setBuscarLoading] = useState(false);
+  const [relacionToDesvincular, setRelacionToDesvincular] = useState(null);
+  const [desvincularLoading, setDesvincularLoading] = useState(false);
+
+  const relacionesActivas = (Array.isArray(profileData?.relaciones_usuarios) ? profileData.relaciones_usuarios : []).filter(
+    (r) => r.estado === 'Activo' || r.estado === 'Pendiente'
+  );
+  const relacionesEntrenadores = relacionesActivas.filter((r) => r.tipo_vinculo === 'Entrenador');
+  const relacionesTutores = relacionesActivas.filter((r) => r.tipo_vinculo === 'Tutor');
 
   const handleCodigoIngresadoChange = (text) => {
     setCodigoIngresado(text);
     if (vincularError) setVincularError('');
+    setPreviewVinculado(null);
   };
 
-  const handleVincularConCodigo = async () => {
-    if (!user?.id || !codigoIngresado?.trim()) {
-      setVincularError('Ingresa el código de tu entrenador o tutor.');
+  const handleBuscarCodigo = async () => {
+    if (!codigoIngresado?.trim()) {
+      setVincularError('Ingresa el código.');
       return;
     }
     setVincularError('');
+    setBuscarLoading(true);
+    try {
+      const encontrado = await buscarUsuarioPorCodigo(codigoIngresado.trim());
+      if (encontrado) {
+        if (encontrado.id === user?.id) {
+          setVincularError('No puedes vincular tu propio código.');
+          setPreviewVinculado(null);
+        } else if (encontrado.rol !== 'Entrenador' && encontrado.rol !== 'Tutor') {
+          setVincularError('El código pertenece a un atleta. Solo puedes vincular con Entrenador o Tutor.');
+          setPreviewVinculado(null);
+        } else {
+          setPreviewVinculado({ ...encontrado, codigo: codigoIngresado.trim() });
+        }
+      } else {
+        setVincularError('Código no encontrado. Verifica que sea correcto.');
+        setPreviewVinculado(null);
+      }
+    } catch {
+      setVincularError('Error al buscar.');
+      setPreviewVinculado(null);
+    } finally {
+      setBuscarLoading(false);
+    }
+  };
+
+  const handleClosePreviewVinculacion = () => {
+    setPreviewVinculado(null);
+    setVincularError('');
+  };
+
+  const handleConfirmVinculacion = async () => {
+    const codigoToUse = previewVinculado?.codigo ?? codigoIngresado?.trim();
+    if (!user?.id || !previewVinculado || !codigoToUse) return;
     setVincularLoading(true);
+    setVincularError('');
     try {
       const { success, error } = await vincularPorCodigo({
         atletaId: user.id,
-        codigo: codigoIngresado.trim(),
+        codigo: codigoToUse,
       });
       if (success) {
         setCodigoIngresado('');
+        setPreviewVinculado(null);
         await refreshUserData();
-        showToast({ type: 'success', title: '¡Solicitud enviada! 🤝', message: 'Tu entrenador o tutor recibirá la solicitud. Una vez aceptada, quedarás vinculado.' });
+        showToast({ type: 'success', title: '¡Solicitud enviada! 🤝', message: `${previewVinculado.nombre} recibirá la solicitud. Una vez aceptada, quedarás vinculado.` });
       } else {
         setVincularError(error || 'No se pudo vincular.');
       }
@@ -271,9 +358,35 @@ export function usePerfil(user) {
     }
   };
 
-  const relacionesActivas = (Array.isArray(profileData?.relaciones_usuarios) ? profileData.relaciones_usuarios : []).filter(
-    (r) => r.estado === 'Activo' || r.estado === 'Pendiente'
-  );
+  const handleDesvincular = (relacion) => {
+    setRelacionToDesvincular(relacion);
+  };
+
+  const handleCloseDesvincularModal = () => {
+    if (!desvincularLoading) setRelacionToDesvincular(null);
+  };
+
+  const handleConfirmDesvincular = async () => {
+    if (!user?.id || !relacionToDesvincular) return;
+    setDesvincularLoading(true);
+    try {
+      const { success, error } = await desvincular({
+        atletaId: user.id,
+        relacionId: relacionToDesvincular.id,
+      });
+      if (success) {
+        setRelacionToDesvincular(null);
+        await refreshUserData();
+        showToast({ type: 'success', title: 'Desvinculado ✓', message: 'La vinculación se ha revocado.' });
+      } else {
+        showToast({ type: 'error', title: 'Error', message: error ?? 'No se pudo desvincular.' });
+      }
+    } catch (err) {
+      showToast({ type: 'error', title: 'Error', message: err?.message ?? 'Error inesperado.' });
+    } finally {
+      setDesvincularLoading(false);
+    }
+  };
 
   const handleCopyCodigo = async () => {
     if (!codigoVinculacion) return;
@@ -383,8 +496,14 @@ export function usePerfil(user) {
     handleDeleteContacto,
     handleLogout,
     handleVincularStrava,
+    handleStravaAuthSuccess,
     handleVincularIntervalos,
     handlePlatformPress,
+    handleDisconnect,
+    handleCloseDisconnectModal,
+    handleConfirmDisconnect,
+    platformToDisconnect,
+    disconnectingPlatform,
     codigoVinculacion,
     handleCopyCodigo,
     handleShareCodigo,
@@ -402,10 +521,21 @@ export function usePerfil(user) {
     codigoIngresado,
     setCodigoIngresado,
     handleCodigoIngresadoChange,
-    handleVincularConCodigo,
+    handleBuscarCodigo,
+    previewVinculado,
+    buscarLoading,
+    handleClosePreviewVinculacion,
+    handleConfirmVinculacion,
     vincularLoading,
     vincularError,
     relacionesActivas,
+    relacionesEntrenadores,
+    relacionesTutores,
+    relacionToDesvincular,
+    handleDesvincular,
+    handleCloseDesvincularModal,
+    handleConfirmDesvincular,
+    desvincularLoading,
     // Password change
     showPasswordSheet,
     newPassword,

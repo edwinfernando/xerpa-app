@@ -1,14 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { LayoutAnimation, Platform, UIManager } from 'react-native';
+import { LayoutAnimation } from 'react-native';
 import { supabase } from '../../../supabase';
-
-if (
-  Platform.OS === 'android'
-  && !global?.nativeFabricUIManager
-  && UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 import { useDeviceContext } from '../../hooks/useDeviceContext';
 import { useUserContext } from '../../context/UserContext';
 import { buildN8nPayload } from '../../utils/buildN8nPayload';

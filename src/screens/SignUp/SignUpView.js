@@ -8,7 +8,6 @@ import {
   Platform,
   ScrollView,
   LayoutAnimation,
-  UIManager,
   Keyboard,
   TouchableWithoutFeedback,
 } from 'react-native';
@@ -17,15 +16,6 @@ import { ScreenWrapper } from '../../components/ScreenWrapper';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { theme } from '../../theme/theme';
-
-// Activar LayoutAnimation en Android
-if (
-  Platform.OS === 'android'
-  && !global?.nativeFabricUIManager
-  && UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 export function SignUpView({
   email,

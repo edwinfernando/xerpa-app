@@ -1,6 +1,7 @@
 /**
  * ContactosEmergenciaSection — Contactos de emergencia (tabla contactos_emergencia)
  * Confirmación de eliminación vía modal propio (sin Alert nativo).
+ * BottomSheet alineado con BiometriaSheet e IntervalsConnectSheet.
  */
 import React, { useState } from 'react';
 import {
@@ -9,12 +10,14 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
+  ScrollView,
   StyleSheet,
 } from 'react-native';
 import Modal from 'react-native-modal';
 import { useNavigationBarColor } from '../../../hooks/useNavigationBarColor';
 import { useModalSwipeScroll } from '../../../hooks/useModalSwipeScroll';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getSheetModalStyle, getSheetModalProps, getCenteredModalStyle } from '../../../constants/sheetModalConfig';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 
@@ -37,7 +40,15 @@ export function ContactosEmergenciaSection({
   const [telefono, setTelefono] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const { scrollOffsetY } = useModalSwipeScroll(110, modalVisible);
+  const SWIPE_HEADER_HEIGHT = 100;
+  const {
+    scrollViewRef,
+    scrollOffsetY,
+    propagateSwipe,
+    scrollTo,
+    onScroll,
+  } = useModalSwipeScroll(SWIPE_HEADER_HEIGHT, modalVisible);
+  const insets = useSafeAreaInsets();
 
   const resetForm = () => {
     setEditingContacto(null);
@@ -152,68 +163,84 @@ export function ContactosEmergenciaSection({
         <Text style={styles.addContactoText}>Añadir nuevo contacto</Text>
       </TouchableOpacity>
 
-      {/* Modal Add/Edit */}
+      {/* Modal Add/Edit — estilo unificado con BiometriaSheet */}
       <Modal
         isVisible={modalVisible}
         onBackdropPress={closeModal}
         onBackButtonPress={closeModal}
         onSwipeComplete={closeModal}
         swipeDirection={scrollOffsetY <= 0 ? ['down'] : undefined}
-        propagateSwipe={true}
+        propagateSwipe={propagateSwipe}
+        scrollTo={scrollTo}
+        scrollOffset={scrollOffsetY}
+        scrollOffsetMax={0}
         animationIn="slideInUp"
         animationOut="slideOutDown"
-        style={{ margin: 0, justifyContent: 'flex-end' }}
+        style={[getSheetModalStyle()]}
+        {...getSheetModalProps()}
       >
         <KeyboardAvoidingView
-          style={styles.pwSheetOverlay}
+          style={styles.sheetOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={closeModal} />
-          <View style={styles.pwSheet}>
-            <View style={styles.pwSheetHandle} />
-            <Text style={styles.pwSheetTitle}>
+          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 34) }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>
               {editingContacto ? 'Editar contacto' : 'Contacto de emergencia'}
             </Text>
+            <Text style={styles.sheetSubtitle}>
+              {editingContacto ? 'Modifica los datos del contacto.' : 'Añade un contacto para situaciones de emergencia.'}
+            </Text>
 
-            <Text style={styles.pwLabel}>Nombre *</Text>
-            <Input
-              value={nombre}
-              onChangeText={setNombre}
-              placeholder="Ej: María García"
-              style={{ marginBottom: 16 }}
-            />
-
-            <Text style={styles.pwLabel}>Parentesco *</Text>
-            <Input
-              value={parentesco}
-              onChangeText={setParentesco}
-              placeholder="Ej: Madre, Padre, Pareja"
-              style={{ marginBottom: 16 }}
-            />
-
-            <Text style={styles.pwLabel}>Teléfono *</Text>
-            <Input
-              value={telefono}
-              onChangeText={setTelefono}
-              placeholder="Ej: +34 612 345 678"
-              keyboardType="phone-pad"
-              error={!!error}
-              errorText={error}
-              style={{ marginBottom: 16 }}
-            />
-
-            {!!error && <Text style={styles.pwErrorText}>{error}</Text>}
-
-            <View style={styles.pwActions}>
-              <Button
-                title="Guardar"
-                variant="primary"
-                onPress={handleSave}
-                loading={saving}
-                disabled={saving}
-                style={[styles.pwSaveBtn, { flex: 1 }]}
+            <ScrollView
+              ref={scrollViewRef}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+              decelerationRate="fast"
+              keyboardShouldPersistTaps="handled"
+              overScrollMode="never"
+              onScroll={onScroll}
+              scrollEventThrottle={16}
+            >
+              <Text style={styles.sheetLabel}>Nombre *</Text>
+              <Input
+                value={nombre}
+                onChangeText={setNombre}
+                placeholder="Ej: María García"
+                style={{ marginBottom: 16 }}
               />
-            </View>
+
+              <Text style={styles.sheetLabel}>Parentesco *</Text>
+              <Input
+                value={parentesco}
+                onChangeText={setParentesco}
+                placeholder="Ej: Madre, Padre, Pareja"
+                style={{ marginBottom: 16 }}
+              />
+
+              <Text style={styles.sheetLabel}>Teléfono *</Text>
+              <Input
+                value={telefono}
+                onChangeText={setTelefono}
+                placeholder="Ej: +34 612 345 678"
+                keyboardType="phone-pad"
+                error={!!error}
+                errorText={error}
+                style={{ marginBottom: 16 }}
+              />
+
+              <View style={styles.sheetActions}>
+                <Button
+                  title="Guardar"
+                  variant="solid"
+                  onPress={handleSave}
+                  loading={saving}
+                  disabled={saving}
+                  style={[styles.sheetSaveBtn, { flex: 1 }]}
+                />
+              </View>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -225,7 +252,8 @@ export function ContactosEmergenciaSection({
         onBackButtonPress={closeConfirmDelete}
         avoidKeyboard
         backdropOpacity={0.6}
-        style={confirmStyles.modal}
+        style={[confirmStyles.modal, getCenteredModalStyle()]}
+        {...getSheetModalProps()}
       >
         <View style={confirmStyles.box}>
           <Text style={confirmStyles.title}>Eliminar contacto</Text>

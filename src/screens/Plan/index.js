@@ -51,6 +51,7 @@ export default function PlanScreen({ user }) {
       <Stack.Screen
         name="AddPlan"
         options={({ navigation }) => ({
+          presentation: 'fullScreenModal',
           title: 'Añadir Entrenamiento',
           headerLeft: () => (
             <TouchableOpacity

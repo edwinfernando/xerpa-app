@@ -14,8 +14,9 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Calendar } from 'lucide-react-native';
+import { Calendar, Clock } from 'lucide-react-native';
 import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/Button';
 import { ScreenWrapper } from '../../../components/ScreenWrapper';
@@ -40,15 +41,29 @@ function formatDateLabel(date) {
   return d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function formatTimeLabel(timeDate) {
+  if (!timeDate || !(timeDate instanceof Date)) return 'Seleccionar hora';
+  const h = timeDate.getHours();
+  const m = timeDate.getMinutes();
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 export function AddPlanScreen({ onSave, onSaved, showToast, styles, navigation }) {
   const today = new Date();
+  const insets = useSafeAreaInsets();
   const [titulo, setTitulo] = useState('');
   const [fecha, setFecha] = useState(today);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [horaDate, setHoraDate] = useState(() => {
+    const d = new Date();
+    d.setHours(8, 0, 0, 0);
+    return d;
+  });
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [tipo, setTipo] = useState('Ride');
   const [duracion, setDuracion] = useState('');
   const [tss, setTss] = useState('');
-  const [hora, setHora] = useState('');
+  const hora = formatTimeLabel(horaDate);
   const [punto_encuentro, setPuntoEncuentro] = useState('');
   const [detalle, setDetalle] = useState('');
   const [tituloError, setTituloError] = useState('');
@@ -61,6 +76,15 @@ export function AddPlanScreen({ onSave, onSaved, showToast, styles, navigation }
     }
     setShowDatePicker(Platform.OS === 'ios');
     if (selected) setFecha(selected);
+  };
+
+  const handleTimeChange = (evt, selected) => {
+    if (evt?.type === 'dismissed') {
+      setShowTimePicker(false);
+      return;
+    }
+    setShowTimePicker(Platform.OS === 'ios');
+    if (selected) setHoraDate(selected);
   };
 
   const handleSave = async () => {
@@ -76,7 +100,7 @@ export function AddPlanScreen({ onSave, onSaved, showToast, styles, navigation }
         tipo,
         duracion_min: duracion,
         tss_plan: tss,
-        hora: hora.trim(),
+        hora: hora,
         punto_encuentro: punto_encuentro.trim(),
         detalle,
       });
@@ -98,7 +122,7 @@ export function AddPlanScreen({ onSave, onSaved, showToast, styles, navigation }
       >
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 40) }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -154,10 +178,12 @@ export function AddPlanScreen({ onSave, onSaved, showToast, styles, navigation }
             <DateTimePicker
               value={fecha}
               mode="date"
-              display="default"
+              display="calendar"
               onChange={handleDateChange}
               minimumDate={getTodayStart()}
               maximumDate={new Date(2030, 11, 31)}
+              locale="es-ES"
+              themeVariant="dark"
             />
           )}
           {Platform.OS === 'ios' && showDatePicker && (
@@ -171,13 +197,45 @@ export function AddPlanScreen({ onSave, onSaved, showToast, styles, navigation }
           <View style={styles.manualRow}>
             <View style={styles.manualRowItem}>
               <Text style={styles.manualLabel}>Hora</Text>
-              <Input
-                value={hora}
-                onChangeText={setHora}
-                placeholder="08:00"
-                keyboardType="numbers-and-punctuation"
-                style={{ marginBottom: 16 }}
-              />
+              <TouchableOpacity
+                onPress={() => setShowTimePicker(true)}
+                style={styles.manualDateTrigger}
+                activeOpacity={0.85}
+              >
+                <Clock color="#00D2FF" size={16} />
+                <Text style={styles.manualDateTriggerText}>
+                  {hora}
+                </Text>
+              </TouchableOpacity>
+              {showTimePicker && Platform.OS === 'ios' && (
+                <View style={{ backgroundColor: '#1C1C1E', borderRadius: 14, paddingVertical: 12, marginBottom: 12 }}>
+                  <DateTimePicker
+                    value={horaDate}
+                    mode="time"
+                    display="spinner"
+                    onChange={handleTimeChange}
+                    locale="es-ES"
+                    themeVariant="dark"
+                  />
+                </View>
+              )}
+              {showTimePicker && Platform.OS === 'android' && (
+                <DateTimePicker
+                  value={horaDate}
+                  mode="time"
+                  display="default"
+                  onChange={handleTimeChange}
+                  locale="es-ES"
+                  themeVariant="dark"
+                />
+              )}
+              {Platform.OS === 'ios' && showTimePicker && (
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 16 }}>
+                  <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                    <Text style={{ color: '#00D2FF', fontWeight: '700' }}>Cerrar</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
             <View style={styles.manualRowItem}>
               <Text style={styles.manualLabel}>Punto de encuentro</Text>
